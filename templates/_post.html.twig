@@ -19,7 +19,10 @@
         {% endif %}
 
         <div class="rezos-post__body">
-            <span class="rezos-post__source">{{ label }}</span>
+            <span class="rezos-post__source">
+                {{- label -}}
+                {% if options.show_account and post.accountName %} · <span class="rezos-post__account">{{ post.accountName }}</span>{% endif -%}
+            </span>
 
             {% if options.show_text and post.text %}
                 <p class="rezos-post__text">

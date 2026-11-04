@@ -44,71 +44,106 @@
 
     <hr>
 
-    {# ─── 2. Connexion de la Page ─────────────────────────── #}
-    <h2>{{ __('2. Page Facebook et compte Instagram') }}</h2>
+    {# ─── 2. Pages Facebook et comptes Instagram ──────────── #}
+    <h2>{{ __('2. Pages Facebook et comptes Instagram') }}</h2>
 
-    {% if connected %}
-        <p>
-            ✅ {{ __('Page connectée :') }} <strong>{{ settings.page_name }}</strong> (ID {{ settings.page_id }})<br>
-            {% if settings.ig_user_id %}
-                ✅ Instagram : <strong>@{{ settings.ig_username }}</strong> (ID {{ settings.ig_user_id }})
-            {% else %}
-                ⚠️ {{ __("Aucun compte Instagram professionnel lié à cette Page.") }}
-            {% endif %}
-        </p>
-        <form method="post" action="{{ post_url }}" style="display:inline">
-            <input type="hidden" name="action" value="rezos_test">
-            {{ wp_nonce_field('rezos_test') }}
-            <button type="submit" class="button">{{ __('Tester la connexion') }}</button>
-        </form>
-        <form method="post" action="{{ post_url }}" style="display:inline">
-            <input type="hidden" name="action" value="rezos_flush">
-            {{ wp_nonce_field('rezos_flush') }}
-            <button type="submit" class="button">{{ __('Vider le cache') }}</button>
-        </form>
-        <form method="post" action="{{ post_url }}" style="display:inline">
-            <input type="hidden" name="action" value="rezos_disconnect">
-            {{ wp_nonce_field('rezos_disconnect') }}
-            <button type="submit" class="button button-link-delete">{{ __('Déconnecter') }}</button>
-        </form>
-    {% elseif pending is not empty %}
+    {% if pending is not empty %}
+        {# Choix des Pages après connexion (plusieurs Pages accessibles) #}
+        <p>{{ __('Cochez les Pages à afficher sur le site. Les Pages décochées seront retirées.') }}</p>
         <form method="post" action="{{ post_url }}">
-            <input type="hidden" name="action" value="rezos_select_page">
-            {{ wp_nonce_field('rezos_select_page') }}
+            <input type="hidden" name="action" value="rezos_select_pages">
+            {{ wp_nonce_field('rezos_select_pages') }}
             <fieldset>
+                {% set connected_ids = accounts|map(a => a.id) %}
                 {% for page in pending %}
                     <label style="display:block;margin:.4em 0">
-                        <input type="radio" name="page_id" value="{{ page.id }}" {{ loop.first ? 'checked' }}>
+                        <input type="checkbox" name="page_ids[]" value="{{ page.id }}"
+                               {{ connected_ids is empty or page.id in connected_ids ? 'checked' }}>
                         <strong>{{ page.name }}</strong>
                         {% if page.ig_username %}— Instagram @{{ page.ig_username }}{% endif %}
                     </label>
                 {% endfor %}
             </fieldset>
-            <p><button type="submit" class="button button-primary">{{ __('Utiliser cette Page') }}</button></p>
+            <p><button type="submit" class="button button-primary">{{ __('Enregistrer la sélection') }}</button></p>
         </form>
-    {% else %}
-        <ol>
-            <li>{{ __('Ouvrez l’Explorateur de l’API Graph (developers.facebook.com/tools/explorer) et sélectionnez votre application.') }}</li>
-            <li>{{ __('Ajoutez les autorisations :') }}
-                <code>pages_show_list</code>, <code>pages_read_engagement</code>,
-                <code>instagram_basic</code>, <code>business_management</code>.</li>
-            <li>{{ __('Générez un « User Token » et collez-le ci-dessous. Il sera échangé contre un token de Page sans expiration.') }}</li>
-        </ol>
-        <form method="post" action="{{ post_url }}">
-            <input type="hidden" name="action" value="rezos_connect">
-            {{ wp_nonce_field('rezos_connect') }}
-            <p>
-                <label for="rezos-user-token" class="screen-reader-text">User Token</label>
-                <textarea id="rezos-user-token" name="user_token" rows="3" class="large-text code" autocomplete="off"
-                          {{ settings.app_id and settings.app_secret ? '' : 'disabled' }}></textarea>
-            </p>
-            <p><button type="submit" class="button button-primary"
-                    {{ settings.app_id and settings.app_secret ? '' : 'disabled' }}>{{ __('Connecter') }}</button></p>
-            {% if not (settings.app_id and settings.app_secret) %}
-                <p class="description">{{ __('Enregistrez d’abord l’App ID et l’App Secret.') }}</p>
-            {% endif %}
-        </form>
+        <hr>
     {% endif %}
+
+    {% if connected %}
+        <table class="widefat striped" style="max-width:900px">
+            <thead>
+                <tr>
+                    <th>{{ __('Page Facebook') }}</th>
+                    <th>Instagram</th>
+                    <th>{{ __('Shortcode') }}</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for account in accounts %}
+                    <tr>
+                        <td><strong>{{ account.name }}</strong><br><small>ID {{ account.id }}</small></td>
+                        <td>
+                            {% if account.hasInstagram %}
+                                @{{ account.igUsername }}
+                            {% else %}
+                                <span title="{{ __('Aucun compte Instagram professionnel lié à cette Page.') }}">—</span>
+                            {% endif %}
+                        </td>
+                        <td><code>[rezos page="{{ account.id }}"]</code></td>
+                        <td>
+                            <form method="post" action="{{ post_url }}">
+                                <input type="hidden" name="action" value="rezos_remove_page">
+                                <input type="hidden" name="page_id" value="{{ account.id }}">
+                                {{ wp_nonce_field('rezos_remove_page') }}
+                                <button type="submit" class="button-link button-link-delete">{{ __('Retirer') }}</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div style="margin:1em 0">
+            <form method="post" action="{{ post_url }}" style="display:inline">
+                <input type="hidden" name="action" value="rezos_test">
+                {{ wp_nonce_field('rezos_test') }}
+                <button type="submit" class="button">{{ __('Tester la connexion') }}</button>
+            </form>
+            <form method="post" action="{{ post_url }}" style="display:inline">
+                <input type="hidden" name="action" value="rezos_flush">
+                {{ wp_nonce_field('rezos_flush') }}
+                <button type="submit" class="button">{{ __('Vider le cache') }}</button>
+            </form>
+            <form method="post" action="{{ post_url }}" style="display:inline">
+                <input type="hidden" name="action" value="rezos_disconnect">
+                {{ wp_nonce_field('rezos_disconnect') }}
+                <button type="submit" class="button button-link-delete">{{ __('Tout déconnecter') }}</button>
+            </form>
+        </div>
+        <h3>{{ __('Ajouter ou mettre à jour des Pages') }}</h3>
+    {% endif %}
+
+    <ol>
+        <li>{{ __('Ouvrez l’Explorateur de l’API Graph (developers.facebook.com/tools/explorer) et sélectionnez votre application.') }}</li>
+        <li>{{ __('Ajoutez les autorisations :') }}
+            <code>pages_show_list</code>, <code>pages_read_engagement</code>,
+            <code>instagram_basic</code>, <code>business_management</code>.</li>
+        <li>{{ __('Générez un « User Token » et collez-le ci-dessous. Toutes les Pages accessibles avec ce token vous seront proposées ; chacune reçoit un token de Page sans expiration.') }}</li>
+    </ol>
+    <form method="post" action="{{ post_url }}">
+        <input type="hidden" name="action" value="rezos_connect">
+        {{ wp_nonce_field('rezos_connect') }}
+        <p>
+            <label for="rezos-user-token" class="screen-reader-text">User Token</label>
+            <textarea id="rezos-user-token" name="user_token" rows="3" class="large-text code" autocomplete="off"
+                      {{ settings.app_id and settings.app_secret ? '' : 'disabled' }}></textarea>
+        </p>
+        <p><button type="submit" class="button button-primary"
+                {{ settings.app_id and settings.app_secret ? '' : 'disabled' }}>{{ __('Connecter') }}</button></p>
+        {% if not (settings.app_id and settings.app_secret) %}
+            <p class="description">{{ __('Enregistrez d’abord l’App ID et l’App Secret.') }}</p>
+        {% endif %}
+    </form>
 
     <hr>
 
@@ -118,15 +153,18 @@
     <table class="widefat striped" style="max-width:900px">
         <thead><tr><th>{{ __('Attribut') }}</th><th>{{ __('Valeurs') }}</th><th>{{ __('Défaut') }}</th></tr></thead>
         <tbody>
+            <tr><td><code>page</code></td><td>{{ __('IDs de Pages et/ou comptes Instagram (@nom), séparés par des virgules') }}</td><td><code>all</code></td></tr>
             <tr><td><code>source</code></td><td><code>all</code>, <code>facebook</code>, <code>instagram</code>, <code>facebook,instagram</code></td><td><code>all</code></td></tr>
             <tr><td><code>limit</code></td><td>1 – 50</td><td>{{ settings.default_limit }}</td></tr>
             <tr><td><code>layout</code></td><td><code>grid</code>, <code>list</code></td><td><code>grid</code></td></tr>
             <tr><td><code>columns</code></td><td>1 – 6</td><td>3</td></tr>
             <tr><td><code>type</code></td><td><code>image</code>, <code>video</code>, <code>album</code>, <code>text</code></td><td>{{ __('tous') }}</td></tr>
             <tr><td><code>show_text</code> / <code>show_date</code> / <code>show_stats</code></td><td><code>true</code>, <code>false</code></td><td>true / true / false</td></tr>
+            <tr><td><code>show_account</code></td><td><code>true</code>, <code>false</code>, <code>auto</code></td><td><code>auto</code> ({{ __('affiché si plusieurs Pages') }})</td></tr>
             <tr><td><code>excerpt</code></td><td>{{ __('nb de caractères (0 = texte complet)') }}</td><td>140</td></tr>
             <tr><td><code>template</code></td><td>{{ __('fichier Twig du thème (dossier rezos/)') }}</td><td><code>feed.html.twig</code></td></tr>
         </tbody>
     </table>
-    <p><code>[rezos source="instagram" limit="6" columns="3"]</code></p>
+    <p><code>[rezos source="instagram" limit="6" columns="3"]</code><br>
+       <code>[rezos page="@moncompte,123456789" show_stats="true"]</code></p>
 </div>

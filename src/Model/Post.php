@@ -19,6 +19,8 @@ final class Post
         public readonly \DateTimeImmutable $createdAt,
         public readonly ?int $likes = null,
         public readonly ?int $comments = null,
+        public readonly string $accountId = '',     // ID de la Page connectée
+        public readonly string $accountName = '',   // nom de la Page ou @compte Instagram
     ) {
     }
 
@@ -43,6 +45,8 @@ final class Post
             'createdAt' => $this->createdAt->format(\DATE_ATOM),
             'likes'     => $this->likes,
             'comments'  => $this->comments,
+            'accountId'   => $this->accountId,
+            'accountName' => $this->accountName,
         ];
     }
 
@@ -59,6 +63,8 @@ final class Post
             new \DateTimeImmutable((string) $data['createdAt']),
             $data['likes'] ?? null,
             $data['comments'] ?? null,
+            (string) ($data['accountId'] ?? ''),
+            (string) ($data['accountName'] ?? ''),
         );
     }
 }

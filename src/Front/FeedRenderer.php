@@ -30,7 +30,7 @@ final class FeedRenderer
         }
 
         $feed = $this->plugin->feed();
-        $posts = $feed->getPosts($opts['source'], $opts['limit'], $opts['type']);
+        $posts = $feed->getPosts($opts['source'], $opts['limit'], $opts['type'], $opts['page']);
 
         wp_enqueue_style('rezos');
 
@@ -51,11 +51,13 @@ final class FeedRenderer
         }
 
         $sources = $this->plugin->feed()->availableSources();
+        $accounts = $this->plugin->settings()->accounts();
         $toBool = static fn (Options $o, mixed $v): bool => filter_var($v, FILTER_VALIDATE_BOOLEAN);
 
         $r = new OptionsResolver();
         $r->setDefaults([
             'source'    => 'all',
+            'page'      => 'all',
             'limit'     => (int) $this->plugin->settings()->get('default_limit'),
             'layout'    => 'grid',
             'columns'   => 3,
@@ -63,6 +65,7 @@ final class FeedRenderer
             'show_text' => true,
             'show_date' => true,
             'show_stats'=> false,
+            'show_account' => null,
             'excerpt'   => 140,
             'template'  => 'feed.html.twig',
         ]);
@@ -81,6 +84,40 @@ final class FeedRenderer
             }
 
             return array_values($list);
+        });
+        // « all », ou une liste d'IDs de Pages et/ou de comptes Instagram (« @nom » ou « nom »).
+        // Résultat : null (toutes les Pages) ou liste d'IDs de Pages.
+        $r->setNormalizer('page', static function (Options $o, mixed $v) use ($accounts): ?array {
+            $list = array_filter(array_map('trim', explode(',', strtolower((string) $v))));
+            if ($list === [] || in_array('all', $list, true)) {
+                return null;
+            }
+            $ids = [];
+            foreach ($list as $wanted) {
+                $match = null;
+                foreach ($accounts as $account) {
+                    if ($wanted === $account->id || ($account->igUsername !== '' && ltrim($wanted, '@') === strtolower($account->igUsername))) {
+                        $match = $account->id;
+                        break;
+                    }
+                }
+                if ($match === null) {
+                    throw new \Symfony\Component\OptionsResolver\Exception\InvalidOptionsException(
+                        sprintf('Page inconnue « %s ». Indiquez l\'ID d\'une Page connectée ou un compte Instagram (@nom).', $wanted),
+                    );
+                }
+                $ids[] = $match;
+            }
+
+            return array_values(array_unique($ids));
+        });
+        // Par défaut, le nom de la Page n'est affiché que si le flux en mélange plusieurs.
+        $r->setNormalizer('show_account', static function (Options $o, mixed $v) use ($accounts): bool {
+            if ($v === null || $v === '' || $v === 'auto') {
+                return count($o['page'] ?? $accounts) > 1;
+            }
+
+            return filter_var($v, FILTER_VALIDATE_BOOLEAN);
         });
         $r->setNormalizer('limit', static fn (Options $o, mixed $v): int => max(1, min(50, (int) $v)));
         $r->setNormalizer('columns', static fn (Options $o, mixed $v): int => max(1, min(6, (int) $v)));

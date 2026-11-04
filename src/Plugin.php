@@ -75,6 +75,7 @@ final class Plugin
                     'instagram' => new InstagramProvider($this->graph(), $settings),
                 ],
                 new FeedCache((int) $settings->get('cache_ttl')),
+                $settings,
             );
         }
 

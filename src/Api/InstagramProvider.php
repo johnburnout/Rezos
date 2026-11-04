@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rezos\Api;
 
+use Rezos\Model\Account;
 use Rezos\Model\Post;
 use Rezos\Settings;
 
@@ -19,33 +20,33 @@ final class InstagramProvider implements PostProviderInterface
     ) {
     }
 
-    public function isAvailable(): bool
+    public function supports(Account $account): bool
     {
-        return $this->settings->isConnected() && $this->settings->get('ig_user_id') !== '';
+        return $account->hasInstagram();
     }
 
-    public function fetch(int $limit): array
+    public function fetch(Account $account, int $limit): array
     {
         $data = $this->graph->get(
-            $this->settings->get('ig_user_id') . '/media',
+            $account->igId . '/media',
             [
                 'fields' => 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
                 'limit'  => min($limit, 100),
             ],
-            (string) $this->settings->get('page_token'),
+            $account->token,
             (string) $this->settings->get('app_secret'),
         );
 
         $posts = [];
         foreach ($data['data'] ?? [] as $item) {
-            $posts[] = $this->map($item);
+            $posts[] = $this->map($item, $account);
         }
 
         return $posts;
     }
 
     /** @param array<string, mixed> $item */
-    private function map(array $item): Post
+    private function map(array $item, Account $account): Post
     {
         $type = (string) ($item['media_type'] ?? 'IMAGE');
 
@@ -64,6 +65,8 @@ final class InstagramProvider implements PostProviderInterface
             createdAt: new \DateTimeImmutable((string) $item['timestamp']),
             likes: isset($item['like_count']) ? (int) $item['like_count'] : null,
             comments: isset($item['comments_count']) ? (int) $item['comments_count'] : null,
+            accountId: $account->id,
+            accountName: '@' . $account->igUsername,
         );
     }
 }

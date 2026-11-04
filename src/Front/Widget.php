@@ -14,6 +14,7 @@ final class Widget extends \WP_Widget
     private const DEFAULTS = [
         'title'     => '',
         'source'    => 'all',
+        'page'      => 'all',
         'limit'     => 6,
         'columns'   => 3,
         'layout'    => 'grid',
@@ -42,6 +43,7 @@ final class Widget extends \WP_Widget
         }
         echo (new FeedRenderer(Plugin::instance()))->render([
             'source'    => $instance['source'],
+            'page'      => $instance['page'],
             'limit'     => $instance['limit'],
             'columns'   => $instance['columns'],
             'layout'    => $instance['layout'],
@@ -62,6 +64,7 @@ final class Widget extends \WP_Widget
         echo Plugin::instance()->twig()->render('admin/widget-form.html.twig', [
             'instance' => $instance,
             'fields'   => $fields,
+            'accounts' => Plugin::instance()->settings()->accounts(),
         ]);
 
         return '';
@@ -77,6 +80,7 @@ final class Widget extends \WP_Widget
         return [
             'title'     => sanitize_text_field($new['title'] ?? ''),
             'source'    => in_array($new['source'] ?? '', ['all', 'facebook', 'instagram'], true) ? $new['source'] : 'all',
+            'page'      => Plugin::instance()->settings()->account((string) ($new['page'] ?? '')) !== null ? (string) $new['page'] : 'all',
             'limit'     => max(1, min(50, (int) ($new['limit'] ?? 6))),
             'columns'   => max(1, min(6, (int) ($new['columns'] ?? 3))),
             'layout'    => ($new['layout'] ?? '') === 'list' ? 'list' : 'grid',

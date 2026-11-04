@@ -1,6 +1,6 @@
 # Rezos
 
-Plugin WordPress qui affiche les publications d'une **Page Facebook** et du **compte Instagram professionnel** qui lui est lié, via l'API Graph de Meta.
+Plugin WordPress qui affiche les publications d'une ou plusieurs **Pages Facebook** et des **comptes Instagram professionnels** qui leur sont liés, via l'API Graph de Meta.
 Stack : Composer, Symfony (HttpClient, OptionsResolver), Twig 3. PHP 8.1+, WordPress 6.0+.
 
 ## Installation
@@ -16,8 +16,10 @@ Activez ensuite **Rezos** dans *Extensions*.
 
 1. **App Meta** : sur developers.facebook.com, créez une app de type *Business*, ajoutez le produit « Instagram » (API with Facebook Login). Copiez l'App ID et l'App Secret dans le plugin.
 2. **Token** : dans l'Explorateur de l'API Graph, choisissez l'app, ajoutez `pages_show_list`, `pages_read_engagement`, `instagram_basic`, `business_management`, générez un *User Token* et collez-le dans le plugin.
-   Le plugin l'échange contre un token long, puis récupère le **token de Page** (sans expiration) et l'ID Instagram lié.
+   Le plugin l'échange contre un token long, puis liste **toutes les Pages accessibles** (avec leur compte Instagram lié). S'il y en a plusieurs, cochez celles à afficher. Chaque Page reçoit son propre **token de Page** (sans expiration).
 3. Cliquez sur **Tester la connexion**.
+
+Pour ajouter des Pages plus tard (y compris d'un autre compte Facebook), collez un nouveau token : les Pages proposées et décochées sont retirées, les autres Pages déjà connectées sont conservées. Chaque Page peut aussi être retirée individuellement.
 
 > Tant que l'app est en mode *Développement*, seuls les comptes ayant un rôle sur l'app fonctionnent — ce qui suffit pour afficher vos propres publications.
 
@@ -29,20 +31,26 @@ Shortcode :
 [rezos]
 [rezos source="instagram" limit="6" columns="3"]
 [rezos source="facebook" layout="list" show_stats="true" excerpt="0"]
+[rezos page="123456789"]
+[rezos page="@moncompte,123456789" source="instagram"]
 ```
+
+Sans attribut `page`, le flux mélange toutes les Pages connectées, triées par date. L'ID de chaque Page est affiché dans *Réglages › Rezos*.
 
 | Attribut | Valeurs | Défaut |
 |---|---|---|
+| `page` | `all`, ou IDs de Pages et/ou comptes Instagram (`@nom`), séparés par des virgules | `all` |
 | `source` | `all`, `facebook`, `instagram`, `facebook,instagram` | `all` |
 | `limit` | 1–50 | réglage (9) |
 | `layout` | `grid`, `list` | `grid` |
 | `columns` | 1–6 | 3 |
 | `type` | `image`, `video`, `album`, `text` | tous |
 | `show_text`, `show_date`, `show_stats` | `true` / `false` | true / true / false |
+| `show_account` | `true` / `false` / `auto` (nom de la Page ou `@compte`) | `auto` : affiché si plusieurs Pages |
 | `excerpt` | nb de caractères, 0 = complet | 140 |
 | `template` | nom d'un template Twig | `feed.html.twig` |
 
-Widget : *Apparence › Widgets › Rezos*.
+Widget : *Apparence › Widgets › Rezos* (choix de la Page lorsque plusieurs sont connectées).
 
 ## Personnaliser l'affichage
 
@@ -56,7 +64,7 @@ Hooks :
 
 ## Cache et résilience
 
-- Chaque source est mise en cache (transients) pendant la durée réglée (1 h par défaut).
+- Chaque source de chaque Page est mise en cache (transients) pendant la durée réglée (1 h par défaut) : avec N Pages, au plus 2 × N appels à l'API par heure.
 - Si l'API renvoie une erreur, le dernier flux valide est servi ; l'erreur n'est visible que des administrateurs.
 - Les URLs d'images Meta expirent au bout de quelques jours : gardez une durée de cache courte.
 
@@ -67,7 +75,8 @@ rezos.php                 bootstrap WordPress
 src/Plugin.php            construction des services + hooks
 src/Settings.php          options
 src/Api/                  GraphClient, FacebookProvider, InstagramProvider
-src/Feed/FeedService.php  agrégation, tri, cache
+src/Feed/FeedService.php  agrégation (sources × Pages), tri, cache
+src/Model/                Post, Account (Page connectée)
 src/Cache/FeedCache.php   transients + copie de secours
 src/Front/                Shortcode, Widget, FeedRenderer (OptionsResolver)
 src/Admin/SettingsPage.php

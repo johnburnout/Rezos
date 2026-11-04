@@ -6,10 +6,11 @@ namespace Rezos\Admin;
 
 use Rezos\Api\GraphException;
 use Rezos\Cache\FeedCache;
+use Rezos\Model\Account;
 use Rezos\Plugin;
 
 /**
- * Réglages > Rezos : identifiants de l'app Meta, connexion de la Page, cache.
+ * Réglages > Rezos : identifiants de l'app Meta, connexion des Pages, cache.
  */
 final class SettingsPage
 {
@@ -26,7 +27,7 @@ final class SettingsPage
             add_options_page('Rezos', 'Rezos', self::CAP, self::SLUG, [$this, 'render']);
         });
 
-        foreach (['save', 'connect', 'select_page', 'test', 'flush', 'disconnect'] as $action) {
+        foreach (['save', 'connect', 'select_pages', 'remove_page', 'test', 'flush', 'disconnect'] as $action) {
             add_action('admin_post_rezos_' . $action, function () use ($action): void {
                 $this->guard($action);
                 $method = 'handle' . str_replace('_', '', ucwords($action, '_'));
@@ -56,6 +57,7 @@ final class SettingsPage
 
         echo $this->plugin->twig()->render('admin/settings.html.twig', [
             'settings'     => $this->plugin->settings()->all(),
+            'accounts'     => $this->plugin->settings()->accounts(),
             'connected'    => $this->plugin->settings()->isConnected(),
             'pending'      => get_transient($this->pendingKey()) ?: [],
             'notice'       => is_array($notice) ? $notice : null,
@@ -84,7 +86,7 @@ final class SettingsPage
         $this->redirect('success', __('Réglages enregistrés.', 'rezos'));
     }
 
-    /** Étape 1 : token utilisateur court → token long → liste des Pages. */
+    /** Étape 1 : token utilisateur court → token long → liste des Pages accessibles. */
     private function handleConnect(): void
     {
         $settings = $this->plugin->settings();
@@ -109,24 +111,42 @@ final class SettingsPage
         }
 
         if (count($pages) === 1) {
-            $this->savePage($pages[0]);
+            $this->savePages($pages, $pages);
         }
 
         set_transient($this->pendingKey(), $pages, 10 * MINUTE_IN_SECONDS);
-        $this->redirect('info', __('Choisissez la Page à afficher.', 'rezos'));
+        $this->redirect('info', __('Choisissez les Pages à afficher.', 'rezos'));
     }
 
-    /** Étape 2 (si plusieurs Pages) : choix de la Page. */
-    private function handleSelectPage(): void
+    /** Étape 2 (si plusieurs Pages) : choix des Pages. */
+    private function handleSelectPages(): void
     {
-        $pages = get_transient($this->pendingKey()) ?: [];
-        $id = (string) ($_POST['page_id'] ?? '');
-        foreach ($pages as $page) {
-            if ($page['id'] === $id) {
-                $this->savePage($page);
-            }
+        $pages = get_transient($this->pendingKey());
+        if (!is_array($pages) || $pages === []) {
+            $this->redirect('error', __('La sélection a expiré, recommencez la connexion.', 'rezos'));
         }
-        $this->redirect('error', __('Page introuvable, recommencez la connexion.', 'rezos'));
+
+        $ids = array_map('strval', (array) wp_unslash($_POST['page_ids'] ?? []));
+        $selected = array_values(array_filter($pages, static fn (array $p): bool => in_array($p['id'], $ids, true)));
+
+        $this->savePages($selected, $pages);
+    }
+
+    private function handleRemovePage(): void
+    {
+        $settings = $this->plugin->settings();
+        $id = (string) wp_unslash($_POST['page_id'] ?? '');
+        $account = $settings->account($id);
+        if ($account === null) {
+            $this->redirect('error', __('Page introuvable.', 'rezos'));
+        }
+
+        $settings->saveAccounts(array_values(array_filter(
+            $settings->accounts(),
+            static fn (Account $a): bool => $a->id !== $id,
+        )));
+        FeedCache::flushAll();
+        $this->redirect('success', sprintf(__('Page « %s » retirée.', 'rezos'), $account->name));
     }
 
     private function handleTest(): void
@@ -134,13 +154,20 @@ final class SettingsPage
         $feed = $this->plugin->feed();
         FeedCache::flushAll();
         $counts = [];
-        foreach ($feed->availableSources() as $source) {
-            $counts[] = sprintf('%s : %d', $source, count($feed->getPosts([$source], 50)));
+        $errors = [];
+        foreach ($this->plugin->settings()->accounts() as $account) {
+            $parts = [];
+            foreach ($feed->availableSources() as $source) {
+                if ($feed->supports($source, $account)) {
+                    $parts[] = sprintf('%s %d', $source, count($feed->getPosts([$source], 50, null, [$account->id])));
+                    $errors = [...$errors, ...$feed->lastErrors()];
+                }
+            }
+            $counts[] = sprintf('%s (%s)', $account->name, implode(', ', $parts));
         }
-        $errors = $feed->lastErrors();
 
         $errors === []
-            ? $this->redirect('success', __('Connexion OK — ', 'rezos') . implode(', ', $counts))
+            ? $this->redirect('success', __('Connexion OK — ', 'rezos') . implode(' ; ', $counts))
             : $this->redirect('error', implode(' | ', $errors));
     }
 
@@ -152,31 +179,48 @@ final class SettingsPage
 
     private function handleDisconnect(): void
     {
-        $this->plugin->settings()->update([
-            'page_id' => '', 'page_name' => '', 'page_token' => '', 'ig_user_id' => '', 'ig_username' => '',
-        ]);
+        $this->plugin->settings()->saveAccounts([]);
+        delete_transient($this->pendingKey());
         FeedCache::flushAll();
-        $this->redirect('success', __('Page déconnectée.', 'rezos'));
+        $this->redirect('success', __('Toutes les Pages ont été déconnectées.', 'rezos'));
     }
 
-    /** @param array{id: string, name: string, access_token: string, ig_id: ?string, ig_username: ?string} $page */
-    private function savePage(array $page): never
+    /**
+     * Enregistre la sélection. Les Pages proposées mais non cochées sont retirées ;
+     * celles connectées avec un autre compte Facebook (absentes de la liste proposée) sont conservées.
+     *
+     * @param list<array{id: string, name: string, access_token: string, ig_id: ?string, ig_username: ?string}> $selected
+     * @param list<array{id: string, name: string, access_token: string, ig_id: ?string, ig_username: ?string}> $offered
+     */
+    private function savePages(array $selected, array $offered): never
     {
-        $this->plugin->settings()->update([
-            'page_id'     => $page['id'],
-            'page_name'   => $page['name'],
-            'page_token'  => $page['access_token'],
-            'ig_user_id'  => $page['ig_id'] ?? '',
-            'ig_username' => $page['ig_username'] ?? '',
-        ]);
+        $settings = $this->plugin->settings();
+        $offeredIds = array_column($offered, 'id');
+
+        $accounts = array_values(array_filter(
+            $settings->accounts(),
+            static fn (Account $a): bool => !in_array($a->id, $offeredIds, true),
+        ));
+        foreach ($selected as $page) {
+            $accounts[] = Account::fromArray($page);
+        }
+
+        $settings->saveAccounts($accounts);
         delete_transient($this->pendingKey());
         FeedCache::flushAll();
 
-        $msg = sprintf(__('Page « %s » connectée.', 'rezos'), $page['name']);
-        $msg .= $page['ig_id']
-            ? ' ' . sprintf(__('Instagram : @%s.', 'rezos'), $page['ig_username'])
-            : ' ' . __("Aucun compte Instagram professionnel n'est lié à cette Page.", 'rezos');
-        $this->redirect('success', $msg);
+        if ($selected === []) {
+            $this->redirect('info', __('Aucune Page sélectionnée.', 'rezos'));
+        }
+
+        $names = array_map(
+            static fn (array $p): string => $p['name'] . ($p['ig_username'] ? ' (@' . $p['ig_username'] . ')' : ''),
+            $selected,
+        );
+        $this->redirect('success', sprintf(
+            _n('Page connectée : %s.', 'Pages connectées : %s.', count($selected), 'rezos'),
+            implode(', ', $names),
+        ));
     }
 
     private function guard(string $action): void

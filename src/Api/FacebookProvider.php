@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rezos\Api;
 
+use Rezos\Model\Account;
 use Rezos\Model\Post;
 use Rezos\Settings;
 
@@ -19,35 +20,35 @@ final class FacebookProvider implements PostProviderInterface
     ) {
     }
 
-    public function isAvailable(): bool
+    public function supports(Account $account): bool
     {
-        return $this->settings->isConnected();
+        return true;
     }
 
-    public function fetch(int $limit): array
+    public function fetch(Account $account, int $limit): array
     {
         $data = $this->graph->get(
-            $this->settings->get('page_id') . '/posts',
+            $account->id . '/posts',
             [
                 'fields' => 'id,message,story,created_time,permalink_url,full_picture,'
                     . 'attachments{media_type,type},'
                     . 'reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0)',
                 'limit'  => min($limit, 100),
             ],
-            (string) $this->settings->get('page_token'),
+            $account->token,
             (string) $this->settings->get('app_secret'),
         );
 
         $posts = [];
         foreach ($data['data'] ?? [] as $item) {
-            $posts[] = $this->map($item);
+            $posts[] = $this->map($item, $account);
         }
 
         return $posts;
     }
 
     /** @param array<string, mixed> $item */
-    private function map(array $item): Post
+    private function map(array $item, Account $account): Post
     {
         $attachmentType = strtolower((string) ($item['attachments']['data'][0]['media_type'] ?? ''));
         $mediaType = match (true) {
@@ -67,6 +68,8 @@ final class FacebookProvider implements PostProviderInterface
             createdAt: new \DateTimeImmutable((string) $item['created_time']),
             likes: isset($item['reactions']['summary']['total_count']) ? (int) $item['reactions']['summary']['total_count'] : null,
             comments: isset($item['comments']['summary']['total_count']) ? (int) $item['comments']['summary']['total_count'] : null,
+            accountId: $account->id,
+            accountName: $account->name,
         );
     }
 }

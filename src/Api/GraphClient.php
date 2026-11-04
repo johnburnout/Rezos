@@ -65,20 +65,31 @@ final class GraphClient
      */
     public function listPages(string $userToken, string $appSecret): array
     {
-        $data = $this->get('me/accounts', [
+        $pages = [];
+        $query = [
             'fields' => 'id,name,access_token,instagram_business_account{id,username}',
             'limit'  => 100,
-        ], $userToken, $appSecret);
+        ];
 
-        $pages = [];
-        foreach ($data['data'] ?? [] as $page) {
-            $pages[] = [
-                'id'           => (string) $page['id'],
-                'name'         => (string) ($page['name'] ?? ''),
-                'access_token' => (string) ($page['access_token'] ?? ''),
-                'ig_id'        => isset($page['instagram_business_account']['id']) ? (string) $page['instagram_business_account']['id'] : null,
-                'ig_username'  => $page['instagram_business_account']['username'] ?? null,
-            ];
+        // Pagination par curseur : on suit « after » tant que l'API annonce une page suivante.
+        for ($i = 0; $i < 20; $i++) {
+            $data = $this->get('me/accounts', $query, $userToken, $appSecret);
+
+            foreach ($data['data'] ?? [] as $page) {
+                $pages[] = [
+                    'id'           => (string) $page['id'],
+                    'name'         => (string) ($page['name'] ?? ''),
+                    'access_token' => (string) ($page['access_token'] ?? ''),
+                    'ig_id'        => isset($page['instagram_business_account']['id']) ? (string) $page['instagram_business_account']['id'] : null,
+                    'ig_username'  => $page['instagram_business_account']['username'] ?? null,
+                ];
+            }
+
+            $after = $data['paging']['cursors']['after'] ?? null;
+            if (empty($data['paging']['next']) || !is_string($after) || $after === '') {
+                break;
+            }
+            $query['after'] = $after;
         }
 
         return $pages;

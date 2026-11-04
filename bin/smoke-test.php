@@ -64,8 +64,10 @@ define('WP_CONTENT_DIR', $tmp);
 define('WP_DEBUG', true);
 define('MINUTE_IN_SECONDS', 60);
 
+// Réglages au format 0.1 (une seule Page) : ils doivent être migrés automatiquement.
 $GLOBALS['wp_options'] = [
-    'rezos_settings' => ['page_id' => '123', 'page_token' => 'tok', 'ig_user_id' => '456', 'app_secret' => 's'],
+    'rezos_settings' => ['page_id' => '111', 'page_name' => 'Boulangerie', 'page_token' => 'tok1',
+                         'ig_user_id' => '911', 'ig_username' => 'boulangerie', 'app_secret' => 's'],
 ];
 $GLOBALS['wp_transients'] = [];
 $GLOBALS['wp_actions'] = [];
@@ -112,23 +114,74 @@ require $build . '/rezos.php';
 do_action('plugins_loaded');
 check(isset($GLOBALS['wp_shortcodes']['rezos']), 'plugin amorcé, shortcode [rezos] enregistré');
 
-// Flux en cache : FeedService ne fera aucun appel réseau.
-$post = static fn (string $source, string $id, string $date, string $type): array => [
+$shortcode = $GLOBALS['wp_shortcodes']['rezos'];
+$settings = Rezos\Plugin::instance()->settings();
+
+// Migration des réglages 0.1
+$legacy = $settings->accounts();
+check(count($legacy) === 1 && $legacy[0]->id === '111' && $legacy[0]->igUsername === 'boulangerie', 'réglages 0.1 migrés vers une liste de Pages');
+
+// Une Page seule : pas de nom de Page affiché (show_account auto).
+$post = static fn (string $source, string $id, string $date, string $type, string $account): array => [
     'source' => $source, 'id' => $id, 'text' => "Publication $id <b>gras</b>",
     'imageUrl' => "https://cdn.test/$id.jpg", 'mediaType' => $type,
     'permalink' => "https://$source.test/$id", 'createdAt' => $date, 'likes' => 3, 'comments' => 1,
+    'accountId' => $account, 'accountName' => "Nom-$account",
 ];
-$GLOBALS['wp_transients']['rezos_feed_facebook'] = [$post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image')];
-$GLOBALS['wp_transients']['rezos_feed_instagram'] = [$post('instagram', 'ig1', '2026-11-02T10:00:00+00:00', 'video')];
+// Flux en cache (clé source_IDPage) : FeedService ne fera aucun appel réseau.
+$GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [$post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111')];
+$GLOBALS['wp_transients']['rezos_feed_instagram_111'] = [$post('instagram', 'ig1', '2026-11-02T10:00:00+00:00', 'video', '111')];
+$GLOBALS['wp_transients']['rezos_feed_facebook_222'] = [$post('facebook', 'fb2', '2026-11-03T10:00:00+00:00', 'text', '222')];
 
-$html = ($GLOBALS['wp_shortcodes']['rezos'])(['limit' => '5', 'show_stats' => 'true']);
-check(str_contains($html, 'rezos-post--instagram') && str_contains($html, 'rezos-post--facebook'), 'shortcode : les deux sources sont affichées');
-check(strpos($html, 'ig1') < strpos($html, 'fb1'), 'shortcode : tri par date décroissante');
-check(str_contains($html, '&lt;b&gt;gras&lt;/b&gt;'), 'shortcode : texte échappé par Twig');
-check(str_contains($html, '♥ 3'), 'shortcode : statistiques (show_stats)');
+$html = $shortcode(['limit' => '5', 'show_stats' => 'true']);
+check(str_contains($html, 'rezos-post--instagram') && str_contains($html, 'rezos-post--facebook'), 'une Page : les deux sources sont affichées');
+check(strpos($html, 'ig1') < strpos($html, 'fb1'), 'une Page : tri par date décroissante');
+check(str_contains($html, '&lt;b&gt;gras&lt;/b&gt;'), 'texte échappé par Twig');
+check(str_contains($html, '♥ 3'), 'statistiques (show_stats)');
+check(!str_contains($html, 'rezos-post__account'), 'une Page : nom de Page masqué par défaut');
 
-$error = ($GLOBALS['wp_shortcodes']['rezos'])(['source' => 'tiktok']);
+$error = $shortcode(['source' => 'tiktok']);
 check(str_contains($error, 'Source inconnue'), 'OptionsResolver préfixé : option invalide refusée');
+
+// Deux Pages, dont une sans Instagram.
+$settings->saveAccounts([...$settings->accounts(), new Rezos\Model\Account('222', 'Fromagerie', 'tok2')]);
+check(!isset($GLOBALS['wp_options']['rezos_settings']['page_id']), 'anciennes clés supprimées à l\'enregistrement');
+
+$html = $shortcode(['limit' => '10']);
+check(str_contains($html, 'fb1') && str_contains($html, 'ig1') && str_contains($html, 'fb2'), 'deux Pages : publications des deux Pages');
+check(strpos($html, 'fb2') < strpos($html, 'ig1'), 'deux Pages : tri par date sur l\'ensemble');
+check(str_contains($html, 'rezos-post__account">Nom-222'), 'deux Pages : nom de la Page affiché');
+
+$html = $shortcode(['page' => '222']);
+check(str_contains($html, 'fb2') && !str_contains($html, 'fb1') && !str_contains($html, 'ig1'), 'page="222" : uniquement cette Page');
+check(!str_contains($html, 'rezos-post__account'), 'page="222" : nom de Page masqué (une seule Page)');
+
+$html = $shortcode(['page' => '@Boulangerie', 'source' => 'instagram']);
+check(str_contains($html, 'ig1') && !str_contains($html, 'fb'), 'page="@compte" : sélection par compte Instagram');
+
+$html = $shortcode(['page' => '111,222', 'show_account' => 'false']);
+check(str_contains($html, 'fb2') && str_contains($html, 'ig1') && !str_contains($html, 'rezos-post__account'), 'page="111,222" + show_account="false"');
+
+$error = $shortcode(['page' => '999']);
+check(str_contains($error, 'Page inconnue'), 'page inconnue refusée');
+
+// Templates d'administration (réglages avec Pages connectées + sélection en attente, widget).
+$twig = Rezos\Plugin::instance()->twig();
+$admin = $twig->render('admin/settings.html.twig', [
+    'settings' => $settings->all(), 'accounts' => $settings->accounts(), 'connected' => true,
+    'pending' => [['id' => '222', 'name' => 'Fromagerie', 'ig_username' => null], ['id' => '333', 'name' => 'Épicerie', 'ig_username' => 'epicerie']],
+    'notice' => null, 'post_url' => '/wp-admin/admin-post.php', 'redirect_uri' => '/',
+]);
+check(str_contains($admin, '[rezos page="222"]') && str_contains($admin, '@boulangerie'), 'admin : liste des Pages connectées');
+check((bool) preg_match('/value="222"\s+checked/', $admin) && !preg_match('/value="333"\s+checked/', $admin), 'admin : Pages déjà connectées pré-cochées');
+$widget = $twig->render('admin/widget-form.html.twig', [
+    'instance' => ['title' => '', 'source' => 'all', 'page' => '222', 'limit' => 6, 'columns' => 3, 'layout' => 'grid', 'show_text' => false],
+    'fields' => array_map(static fn (string $k): array => ['id' => $k, 'name' => $k], array_combine(
+        ['title', 'source', 'page', 'limit', 'columns', 'layout', 'show_text'], ['title', 'source', 'page', 'limit', 'columns', 'layout', 'show_text'],
+    )),
+    'accounts' => $settings->accounts(),
+]);
+check((bool) preg_match('/value="222" selected/', $widget), 'widget : choix de la Page');
 
 // Compilation Twig avec cache disque (le code généré doit utiliser les classes préfixées).
 $compiled = glob(WP_CONTENT_DIR . '/cache/rezos-twig/*/*.php') ?: [];
@@ -140,10 +193,18 @@ check(!preg_match('/(?<![\\\\\w])Twig\\\\/', str_replace('RezosVendor\\Twig\\', 
 // 5. GraphClient avec Symfony HttpClient préfixé (faux transport).
 // ---------------------------------------------------------------------------
 echo "API Graph\n";
-$mock = new RezosVendor\Symfony\Component\HttpClient\MockHttpClient([
-    new RezosVendor\Symfony\Component\HttpClient\Response\MockResponse('{"data":[{"id":"1"}]}'),
-    new RezosVendor\Symfony\Component\HttpClient\Response\MockResponse('{"error":{"type":"OAuthException","code":190,"message":"expiré"}}', ['http_code' => 400]),
-]);
+$requests = [];
+$mock = new RezosVendor\Symfony\Component\HttpClient\MockHttpClient(static function (string $method, string $url) use (&$requests) {
+    $requests[] = $url;
+    $json = match (count($requests)) {
+        1 => '{"data":[{"id":"1"}]}',
+        2 => '{"error":{"type":"OAuthException","code":190,"message":"expiré"}}',
+        3 => '{"data":[{"id":"p1","name":"A","access_token":"t1"}],"paging":{"cursors":{"after":"CUR"},"next":"https://graph.facebook.com/next"}}',
+        default => '{"data":[{"id":"p2","name":"B","access_token":"t2","instagram_business_account":{"id":"ig2","username":"b"}}],"paging":{"cursors":{"after":"END"}}}',
+    };
+
+    return new RezosVendor\Symfony\Component\HttpClient\Response\MockResponse($json, ['http_code' => count($requests) === 2 ? 400 : 200]);
+});
 $graph = new Rezos\Api\GraphClient($mock, 'v25.0');
 check(($graph->get('me', [], 'tok', 's')['data'][0]['id'] ?? null) === '1', 'requête GET décodée');
 try {
@@ -152,6 +213,9 @@ try {
 } catch (Rezos\Api\GraphException $e) {
     check($e->isAuthError(), 'erreur Graph convertie en GraphException (code 190)');
 }
+$pages = $graph->listPages('tok', 's');
+check(array_column($pages, 'id') === ['p1', 'p2'] && $pages[1]['ig_id'] === 'ig2', 'me/accounts : toutes les Pages (pagination)');
+check(str_contains($requests[3] ?? '', 'after=CUR') && count($requests) === 4, 'me/accounts : curseur « after » suivi, arrêt sans « next »');
 
 // ---------------------------------------------------------------------------
 // 6. Cohabitation avec l'autre Twig.

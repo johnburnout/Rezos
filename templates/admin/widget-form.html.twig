@@ -2,6 +2,19 @@
     <label for="{{ fields.title.id }}">{{ __('Titre :') }}</label>
     <input class="widefat" id="{{ fields.title.id }}" name="{{ fields.title.name }}" type="text" value="{{ instance.title }}">
 </p>
+{% if accounts|length > 1 %}
+<p>
+    <label for="{{ fields.page.id }}">{{ __('Page :') }}</label>
+    <select class="widefat" id="{{ fields.page.id }}" name="{{ fields.page.name }}">
+        <option value="all" {{ instance.page == 'all' ? 'selected' }}>{{ __('Toutes les Pages') }}</option>
+        {% for account in accounts %}
+            <option value="{{ account.id }}" {{ instance.page == account.id ? 'selected' }}>
+                {{ account.name }}{% if account.hasInstagram %} (@{{ account.igUsername }}){% endif %}
+            </option>
+        {% endfor %}
+    </select>
+</p>
+{% endif %}
 <p>
     <label for="{{ fields.source.id }}">{{ __('Source :') }}</label>
     <select class="widefat" id="{{ fields.source.id }}" name="{{ fields.source.name }}">
