@@ -2,7 +2,7 @@
     "name": "jean/rezos",
     "description": "Plugin WordPress : affiche les publications Facebook et Instagram d'une Page sur le site.",
     "type": "wordpress-plugin",
-    "license": "GPL-2.0-or-later",
+    "license": "GPL-3.0-or-later",
     "require": {
         "php": ">=8.1",
         "symfony/http-client": "^6.4",
