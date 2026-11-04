@@ -20,7 +20,8 @@ return [
         // Code du plugin et templates.
         Finder::create()->files()->in('src')->name('*.php'),
         Finder::create()->files()->in('templates'),
-        Finder::create()->files()->in('assets'),
+        // Sans assets/logo/ : logos du dépôt et images wordpress.org, inutiles dans le plugin.
+        Finder::create()->files()->in('assets')->exclude('logo'),
         // Dépendances de production (sans tests ni docs).
         Finder::create()
             ->files()

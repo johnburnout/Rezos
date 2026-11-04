@@ -1,4 +1,9 @@
-# Rezos
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/rezos-logo-dark.svg">
+    <img src="assets/logo/rezos-logo.svg" alt="Rézos" width="320">
+  </picture>
+</h1>
 
 Plugin WordPress qui affiche les publications d'une ou plusieurs **Pages Facebook** et des **comptes Instagram professionnels** qui leur sont liés, via l'API Graph de Meta.
 Stack : Composer, Symfony (HttpClient, OptionsResolver), Twig 3. PHP 8.1+, WordPress 6.0+.
