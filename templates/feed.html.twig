@@ -1,0 +1,30 @@
+{#
+  Flux Rezos.
+  Pour personnaliser : copiez ce fichier dans wp-content/themes/<votre-thème>/rezos/feed.html.twig
+
+  Variables :
+    posts   : liste de Rezos\Model\Post (source, id, text, imageUrl, mediaType, permalink, createdAt, likes, comments)
+    options : options résolues du shortcode / widget
+    errors  : erreurs API (visibles uniquement par les administrateurs)
+    uid     : identifiant HTML unique
+#}
+<div id="{{ uid }}"
+     class="rezos rezos--{{ options.layout }}"
+     style="--rezos-columns: {{ options.columns }}">
+
+    {% for error in errors %}
+        <p class="rezos-error">Rezos — {{ error }}</p>
+    {% endfor %}
+
+    {% if posts is empty %}
+        <p class="rezos__empty">{{ __('Aucune publication pour le moment.') }}</p>
+    {% else %}
+        <ul class="rezos__list">
+            {% for post in posts %}
+                <li class="rezos__item">
+                    {% include '_post.html.twig' with { post: post, options: options } only %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</div>

@@ -1,0 +1,112 @@
+/* Rezos — styles de base, volontairement sobres pour hériter du thème. */
+.rezos {
+    --rezos-gap: 1rem;
+    --rezos-radius: 8px;
+    --rezos-muted: color-mix(in srgb, currentColor 60%, transparent);
+    --rezos-border: color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.rezos__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--rezos-gap);
+}
+
+.rezos--grid .rezos__list {
+    grid-template-columns: repeat(var(--rezos-columns, 3), minmax(0, 1fr));
+}
+
+@media (max-width: 782px) {
+    .rezos--grid .rezos__list { grid-template-columns: repeat(min(2, var(--rezos-columns, 3)), minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+    .rezos--grid .rezos__list { grid-template-columns: 1fr; }
+}
+
+.rezos__item { margin: 0; }
+
+.rezos-post {
+    height: 100%;
+    border: 1px solid var(--rezos-border);
+    border-radius: var(--rezos-radius);
+    overflow: hidden;
+}
+
+.rezos-post__link {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    color: inherit;
+    text-decoration: none;
+}
+.rezos-post__link:hover .rezos-post__media img { transform: scale(1.03); }
+.rezos-post__link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+.rezos-post__media {
+    position: relative;
+    margin: 0;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--rezos-border);
+}
+.rezos-post__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform .3s ease;
+}
+
+.rezos-post__badge {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    padding: .15rem .45rem;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, .55);
+    color: #fff;
+    font-size: .8rem;
+    line-height: 1.4;
+}
+
+.rezos-post__body {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    padding: .75rem;
+    flex: 1;
+}
+
+.rezos-post__source {
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--rezos-muted);
+}
+
+.rezos-post__text { margin: 0; font-size: .95rem; overflow-wrap: anywhere; }
+
+.rezos-post__meta {
+    margin-top: auto;
+    display: flex;
+    gap: .75rem;
+    font-size: .8rem;
+    color: var(--rezos-muted);
+}
+
+/* Disposition liste : image à gauche */
+.rezos--list .rezos-post__link { flex-direction: row; }
+.rezos--list .rezos-post__media { flex: 0 0 min(35%, 220px); }
+
+.rezos__empty { color: var(--rezos-muted); }
+
+.rezos-error {
+    padding: .5rem .75rem;
+    border-left: 4px solid #d63638;
+    background: #fcf0f1;
+    color: #50575e;
+    font-size: .85rem;
+}

@@ -1,0 +1,41 @@
+{% set label = post.source == 'instagram' ? 'Instagram' : 'Facebook' %}
+<article class="rezos-post rezos-post--{{ post.source }} rezos-post--{{ post.mediaType }}">
+    <a class="rezos-post__link"
+       href="{{ post.permalink|esc_url }}"
+       target="_blank" rel="noopener noreferrer"
+       aria-label="{{ __('Voir la publication sur') }} {{ label }}">
+
+        {% if post.imageUrl %}
+            <figure class="rezos-post__media">
+                <img src="{{ post.imageUrl|esc_url }}"
+                     alt="{{ post.excerpt(100) }}"
+                     loading="lazy" decoding="async">
+                {% if post.mediaType == 'video' %}
+                    <span class="rezos-post__badge" aria-hidden="true">▶</span>
+                {% elseif post.mediaType == 'album' %}
+                    <span class="rezos-post__badge" aria-hidden="true">❐</span>
+                {% endif %}
+            </figure>
+        {% endif %}
+
+        <div class="rezos-post__body">
+            <span class="rezos-post__source">{{ label }}</span>
+
+            {% if options.show_text and post.text %}
+                <p class="rezos-post__text">
+                    {{ options.excerpt > 0 ? post.excerpt(options.excerpt) : post.text }}
+                </p>
+            {% endif %}
+
+            <footer class="rezos-post__meta">
+                {% if options.show_date %}
+                    <time datetime="{{ post.createdAt|date('c') }}">{{ post.createdAt|wp_date }}</time>
+                {% endif %}
+                {% if options.show_stats %}
+                    {% if post.likes is not null %}<span class="rezos-post__stat">♥ {{ post.likes }}</span>{% endif %}
+                    {% if post.comments is not null %}<span class="rezos-post__stat">💬 {{ post.comments }}</span>{% endif %}
+                {% endif %}
+            </footer>
+        </div>
+    </a>
+</article>

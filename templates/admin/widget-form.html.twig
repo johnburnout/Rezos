@@ -1,0 +1,30 @@
+<p>
+    <label for="{{ fields.title.id }}">{{ __('Titre :') }}</label>
+    <input class="widefat" id="{{ fields.title.id }}" name="{{ fields.title.name }}" type="text" value="{{ instance.title }}">
+</p>
+<p>
+    <label for="{{ fields.source.id }}">{{ __('Source :') }}</label>
+    <select class="widefat" id="{{ fields.source.id }}" name="{{ fields.source.name }}">
+        {% for value, label in { all: __('Facebook + Instagram'), facebook: 'Facebook', instagram: 'Instagram' } %}
+            <option value="{{ value }}" {{ instance.source == value ? 'selected' }}>{{ label }}</option>
+        {% endfor %}
+    </select>
+</p>
+<p>
+    <label for="{{ fields.limit.id }}">{{ __('Nombre :') }}</label>
+    <input class="tiny-text" id="{{ fields.limit.id }}" name="{{ fields.limit.name }}" type="number" min="1" max="50" value="{{ instance.limit }}">
+    &nbsp;
+    <label for="{{ fields.columns.id }}">{{ __('Colonnes :') }}</label>
+    <input class="tiny-text" id="{{ fields.columns.id }}" name="{{ fields.columns.name }}" type="number" min="1" max="6" value="{{ instance.columns }}">
+</p>
+<p>
+    <label for="{{ fields.layout.id }}">{{ __('Disposition :') }}</label>
+    <select id="{{ fields.layout.id }}" name="{{ fields.layout.name }}">
+        <option value="grid" {{ instance.layout == 'grid' ? 'selected' }}>{{ __('Grille') }}</option>
+        <option value="list" {{ instance.layout == 'list' ? 'selected' }}>{{ __('Liste') }}</option>
+    </select>
+</p>
+<p>
+    <input class="checkbox" id="{{ fields.show_text.id }}" name="{{ fields.show_text.name }}" type="checkbox" value="1" {{ instance.show_text ? 'checked' }}>
+    <label for="{{ fields.show_text.id }}">{{ __('Afficher le texte') }}</label>
+</p>
