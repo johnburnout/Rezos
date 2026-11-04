@@ -68,7 +68,12 @@ define('MINUTE_IN_SECONDS', 60);
 $GLOBALS['wp_options'] = [
     'rezos_settings' => ['page_id' => '111', 'page_name' => 'Boulangerie', 'page_token' => 'tok1',
                          'ig_user_id' => '911', 'ig_username' => 'boulangerie', 'app_secret' => 's'],
+    // Cache au format 0.1 (par source uniquement) : doit être supprimé à la mise à jour.
+    'rezos_stale_facebook'  => [['legacy']],
+    'rezos_stale_instagram' => [['legacy']],
 ];
+$GLOBALS['wp_transients']['rezos_feed_facebook'] = [['legacy']];
+$GLOBALS['wp_transients']['rezos_feed_instagram'] = [['legacy']];
 $GLOBALS['wp_transients'] = [];
 $GLOBALS['wp_actions'] = [];
 $GLOBALS['wp_shortcodes'] = [];
@@ -88,6 +93,8 @@ function is_admin(): bool { return false; }
 function current_user_can(string $cap): bool { return true; }
 function get_option(string $name, mixed $default = false): mixed { return $GLOBALS['wp_options'][$name] ?? $default; }
 function update_option(string $name, mixed $value, mixed $autoload = null): bool { $GLOBALS['wp_options'][$name] = $value; return true; }
+function delete_option(string $name): bool { unset($GLOBALS['wp_options'][$name]); return true; }
+function delete_transient(string $name): bool { unset($GLOBALS['wp_transients'][$name]); return true; }
 function get_transient(string $name): mixed { return $GLOBALS['wp_transients'][$name] ?? false; }
 function set_transient(string $name, mixed $value, int $ttl = 0): bool { $GLOBALS['wp_transients'][$name] = $value; return true; }
 function get_stylesheet_directory(): string { return $GLOBALS['tmp_theme'] ?? '/nonexistent'; }
@@ -113,6 +120,14 @@ echo "Plugin\n";
 require $build . '/rezos.php';
 do_action('plugins_loaded');
 check(isset($GLOBALS['wp_shortcodes']['rezos']), 'plugin amorcé, shortcode [rezos] enregistré');
+
+// Mise à jour 0.1 → 0.2 au démarrage.
+$opts = $GLOBALS['wp_options'];
+check(($opts['rezos_db_version'] ?? null) === REZOS_VERSION, 'mise à jour : version des données enregistrée (' . REZOS_VERSION . ')');
+check(!isset($opts['rezos_settings']['page_id']) && count($opts['rezos_settings']['accounts'] ?? []) === 1, 'mise à jour : réglages réenregistrés au format « accounts »');
+check(!isset($opts['rezos_stale_facebook'], $opts['rezos_stale_instagram'])
+    && !isset($GLOBALS['wp_transients']['rezos_feed_facebook'], $GLOBALS['wp_transients']['rezos_feed_instagram']),
+    'mise à jour : ancien cache 0.1 supprimé');
 
 $shortcode = $GLOBALS['wp_shortcodes']['rezos'];
 $settings = Rezos\Plugin::instance()->settings();
@@ -145,7 +160,6 @@ check(str_contains($error, 'Source inconnue'), 'OptionsResolver préfixé : opti
 
 // Deux Pages, dont une sans Instagram.
 $settings->saveAccounts([...$settings->accounts(), new Rezos\Model\Account('222', 'Fromagerie', 'tok2')]);
-check(!isset($GLOBALS['wp_options']['rezos_settings']['page_id']), 'anciennes clés supprimées à l\'enregistrement');
 
 $html = $shortcode(['limit' => '10']);
 check(str_contains($html, 'fb1') && str_contains($html, 'ig1') && str_contains($html, 'fb2'), 'deux Pages : publications des deux Pages');

@@ -21,6 +21,9 @@ use Twig\Environment;
  */
 final class Plugin
 {
+    /** Version des données enregistrées (réglages, cache), pour les migrations. */
+    public const DB_VERSION_OPTION = 'rezos_db_version';
+
     private static ?self $instance = null;
 
     private ?Settings $settings = null;
@@ -36,6 +39,8 @@ final class Plugin
     public function boot(): void
     {
         load_plugin_textdomain('rezos', false, dirname(plugin_basename(REZOS_FILE)) . '/languages');
+
+        $this->maybeUpgrade();
 
         (new Shortcode($this))->register();
 
@@ -87,9 +92,34 @@ final class Plugin
         return $this->twig ??= TwigFactory::create(REZOS_DIR . 'templates');
     }
 
+    /**
+     * Migrations des données, exécutées une seule fois après une mise à jour du plugin.
+     */
+    private function maybeUpgrade(): void
+    {
+        $installed = (string) get_option(self::DB_VERSION_OPTION, '0');
+        if (version_compare($installed, REZOS_VERSION, '>=')) {
+            return;
+        }
+
+        if (version_compare($installed, '0.2.0', '<')) {
+            // 0.1 → 0.2 : une seule Page → liste « accounts ». Settings migre à la lecture ;
+            // on réenregistre pour supprimer les anciennes clés (page_id, page_token…).
+            if (is_array(get_option(Settings::OPTION))) {
+                $this->settings()->update([]);
+            }
+            // Le cache n'était tenu que par source (« facebook »), il l'est désormais par source et par Page.
+            FeedCache::forget('facebook');
+            FeedCache::forget('instagram');
+        }
+
+        update_option(self::DB_VERSION_OPTION, REZOS_VERSION, true);
+    }
+
     public static function uninstall(): void
     {
         delete_option(Settings::OPTION);
+        delete_option(self::DB_VERSION_OPTION);
         FeedCache::flushAll();
     }
 }

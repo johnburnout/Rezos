@@ -39,6 +39,13 @@ final class FeedCache
         update_option(self::STALE_PREFIX . $key, $payload, false);
     }
 
+    /** Supprime une entrée de cache et sa copie de secours. */
+    public static function forget(string $key): void
+    {
+        delete_transient(self::PREFIX . $key);
+        delete_option(self::STALE_PREFIX . $key);
+    }
+
     public static function flushAll(): void
     {
         global $wpdb;
