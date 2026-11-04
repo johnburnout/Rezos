@@ -5,12 +5,25 @@ Stack : Composer, Symfony (HttpClient, OptionsResolver), Twig 3. PHP 8.1+, WordP
 
 ## Installation
 
+### Depuis une release (recommandé)
+
+1. Téléchargez `rezos-<version>.zip` depuis la [dernière release](https://github.com/johnburnout/Rezos/releases/latest).
+2. Dans WordPress : *Extensions › Ajouter › Téléverser une extension*, choisissez le zip, puis **Activer**.
+
+Le zip contient déjà les dépendances, préfixées pour éviter les conflits avec d'autres plugins (voir [Build distribuable](#build-distribuable-dépendances-préfixées)) : Composer n'est pas nécessaire.
+
+Pour mettre à jour, téléversez le zip de la nouvelle version : WordPress propose de remplacer l'extension existante. Les réglages sont conservés et migrés si besoin.
+
+### Depuis les sources (développement)
+
 ```bash
-cd wp-content/plugins/rezos
+cd wp-content/plugins
+git clone https://github.com/johnburnout/Rezos.git rezos
+cd rezos
 composer install --no-dev --optimize-autoloader
 ```
 
-Activez ensuite **Rezos** dans *Extensions*.
+Activez ensuite **Rezos** dans *Extensions*. Dans ce mode, Symfony et Twig ne sont pas préfixés.
 
 ## Configuration (Réglages › Rezos)
 
