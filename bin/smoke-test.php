@@ -183,6 +183,29 @@ check(Rezos\Front\Shortcode::parse('[rezos rows="2" featured="true"]') === ['row
     && Rezos\Front\Shortcode::parse('[gallery ids="1"]') === null, 'aperçu : analyse du shortcode saisi');
 $GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [$post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111')];
 
+// Rediffusions Facebook ↔ Instagram : même texte, même Page, moins de 24 h d'écart.
+$same = static fn (array $p, string $text): array => ['text' => $text] + $p;
+$GLOBALS['wp_transients']['rezos_feed_instagram_111'] = [
+    $post('instagram', 'ig1', '2026-11-02T10:00:00+00:00', 'video', '111'),
+    $same($post('instagram', 'igA', '2026-10-20T10:00:00+00:00', 'image', '111'), 'Nouveau  pain !'),
+    $same($post('instagram', 'igB', '2026-10-21T10:00:00+00:00', 'image', '111'), 'Brioche'),
+];
+$GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [
+    $post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111'),
+    $same($post('facebook', 'fbA', '2026-10-20T10:02:00+00:00', 'image', '111'), "nouveau pain !\n"),
+    $same($post('facebook', 'fbB', '2026-10-25T10:00:00+00:00', 'image', '111'), 'Brioche'),
+    $same($post('facebook', 'fbC', '2026-10-19T10:00:00+00:00', 'image', '111'), 'Croissant'),
+];
+$GLOBALS['wp_transients']['rezos_feed_instagram_111'][] = $same($post('instagram', 'igC', '2026-10-19T09:00:00+00:00', 'image', '111'), 'Croissant');
+$html = $shortcode(['limit' => '20']);
+check(str_contains($html, 'igA') && !str_contains($html, 'fbA'), 'rediffusion Facebook d\'un post Instagram masquée');
+check(str_contains($html, 'igC') && !str_contains($html, 'fbC'), 'rediffusion Instagram d\'un post Facebook masquée (la plus ancienne est gardée)');
+check(str_contains($html, 'igB') && str_contains($html, 'fbB'), 'même texte à plus de 24 h d\'écart : les deux sont affichées');
+$html = $shortcode(['limit' => '20', 'source' => 'facebook']);
+check(str_contains($html, 'fbA'), 'source="facebook" seule : la publication Facebook reste affichée');
+$GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [$post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111')];
+$GLOBALS['wp_transients']['rezos_feed_instagram_111'] = [$post('instagram', 'ig1', '2026-11-02T10:00:00+00:00', 'video', '111')];
+
 $error = $shortcode(['source' => 'tiktok']);
 check(str_contains($error, 'Source inconnue'), 'OptionsResolver préfixé : option invalide refusée');
 

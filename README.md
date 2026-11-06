@@ -54,7 +54,9 @@ Shortcode :
 [rezos page="@moncompte,123456789" source="instagram"]
 ```
 
-Sans attribut `page`, le flux mélange toutes les Pages connectées, triées par date. L'ID de chaque Page est affiché dans *Réglages › Rezos*.
+Sans attribut `page`, le flux mélange toutes les Pages connectées, triées par date.
+
+Quand le flux affiche les deux sources, les **rediffusions** sont masquées : une publication Facebook qui reprend une publication Instagram de la même Page (ou l'inverse), avec le même texte et à moins de 24 h d'écart, n'apparaît qu'une fois — seule la plus ancienne est gardée. L'ID de chaque Page est affiché dans *Réglages › Rezos*.
 
 | Attribut | Valeurs | Défaut |
 |---|---|---|

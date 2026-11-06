@@ -19,6 +19,9 @@ final class FeedService
     /** Nombre de posts récupérés par source et par Page (on filtre ensuite selon `limit`). */
     private const FETCH_SIZE = 30;
 
+    /** Écart maximal entre une publication et sa rediffusion sur l'autre réseau. */
+    private const CROSSPOST_WINDOW = 86400;
+
     /** @var list<string> */
     private array $lastErrors = [];
 
@@ -48,6 +51,8 @@ final class FeedService
             }
         }
 
+        $posts = self::withoutCrossPosts($posts);
+
         if ($type !== null && $type !== '') {
             $posts = array_filter($posts, static fn (Post $p): bool => $p->mediaType === $type);
         }
@@ -55,6 +60,43 @@ final class FeedService
         usort($posts, static fn (Post $a, Post $b): int => $b->createdAt <=> $a->createdAt);
 
         return array_slice(array_values($posts), 0, max(1, $limit));
+    }
+
+    /**
+     * Retire les rediffusions Facebook ↔ Instagram : même Page, même texte, autre source,
+     * publiées à moins de CROSSPOST_WINDOW d'intervalle. L'API ne signale pas les rediffusions ;
+     * on garde la plus ancienne (l'originale). Les publications sans texte ne sont jamais rapprochées.
+     *
+     * @param list<Post> $posts
+     * @return list<Post>
+     */
+    private static function withoutCrossPosts(array $posts): array
+    {
+        // Du plus ancien au plus récent ; à égalité, Instagram d'abord (partage vers Facebook le plus courant).
+        usort($posts, static fn (Post $a, Post $b): int => [$a->createdAt, $a->source !== 'instagram']
+            <=> [$b->createdAt, $b->source !== 'instagram']);
+
+        $kept = [];
+        $originals = []; // empreinte → publications conservées
+        foreach ($posts as $post) {
+            $text = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $post->text) ?? ''));
+            if ($text === '') {
+                $kept[] = $post;
+                continue;
+            }
+
+            $key = $post->accountId . "\0" . $text;
+            foreach ($originals[$key] ?? [] as $original) {
+                if ($original->source !== $post->source
+                    && $post->createdAt->getTimestamp() - $original->createdAt->getTimestamp() <= self::CROSSPOST_WINDOW) {
+                    continue 2;
+                }
+            }
+            $originals[$key][] = $post;
+            $kept[] = $post;
+        }
+
+        return $kept;
     }
 
     /** @return list<string> */
