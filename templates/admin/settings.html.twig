@@ -35,8 +35,21 @@
                 <td><input id="rezos-ttl" name="cache_ttl" type="number" min="300" step="60" class="small-text" value="{{ settings.cache_ttl }}"></td>
             </tr>
             <tr>
-                <th scope="row"><label for="rezos-limit">{{ __('Nombre de publications par défaut') }}</label></th>
-                <td><input id="rezos-limit" name="default_limit" type="number" min="1" max="50" class="small-text" value="{{ settings.default_limit }}"></td>
+                <th scope="row">{{ __('Grille par défaut') }}</th>
+                <td>
+                    <label for="rezos-columns">{{ __('Publications par ligne') }}</label>
+                    <input id="rezos-columns" name="default_columns" type="number" min="1" max="6" class="small-text" value="{{ settings.default_columns }}">
+                    &nbsp;
+                    <label for="rezos-rows">{{ __('Nombre de lignes') }}</label>
+                    <input id="rezos-rows" name="default_rows" type="number" min="1" max="10" class="small-text" value="{{ settings.default_rows }}">
+                    <p>
+                        <label>
+                            <input name="default_featured" type="checkbox" value="1" {{ settings.default_featured ? 'checked' }}>
+                            {{ __('Première ligne : une seule publication, sur toute la largeur') }}
+                        </label>
+                    </p>
+                    <p class="description">{{ __('Modifiables pour chaque shortcode avec les attributs columns, rows et featured.') }}</p>
+                </td>
             </tr>
         </table>
         <p><button type="submit" class="button button-primary">{{ __('Enregistrer') }}</button></p>
@@ -90,7 +103,10 @@
                                 <span title="{{ __('Aucun compte Instagram professionnel lié à cette Page.') }}">—</span>
                             {% endif %}
                         </td>
-                        <td><code>[rezos page="{{ account.id }}"]</code></td>
+                        <td>
+                            <code>[rezos page="{{ account.id }}"]</code><br>
+                            <a href="{{ admin_url('options-general.php?page=rezos&preview=' ~ ('[rezos page="' ~ account.id ~ '"]')|url_encode) }}#rezos-preview">{{ __('Aperçu') }}</a>
+                        </td>
                         <td>
                             <form method="post" action="{{ post_url }}">
                                 <input type="hidden" name="action" value="rezos_remove_page">
@@ -155,9 +171,11 @@
         <tbody>
             <tr><td><code>page</code></td><td>{{ __('IDs de Pages et/ou comptes Instagram (@nom), séparés par des virgules') }}</td><td><code>all</code></td></tr>
             <tr><td><code>source</code></td><td><code>all</code>, <code>facebook</code>, <code>instagram</code>, <code>facebook,instagram</code></td><td><code>all</code></td></tr>
-            <tr><td><code>limit</code></td><td>1 – 50</td><td>{{ settings.default_limit }}</td></tr>
-            <tr><td><code>layout</code></td><td><code>grid</code>, <code>list</code></td><td><code>grid</code></td></tr>
-            <tr><td><code>columns</code></td><td>1 – 6</td><td>3</td></tr>
+            <tr><td><code>columns</code></td><td>{{ __('publications par ligne') }}, 1 – 6</td><td>{{ settings.default_columns }}</td></tr>
+            <tr><td><code>rows</code></td><td>{{ __('nombre de lignes') }}, 1 – 10</td><td>{{ settings.default_rows }}</td></tr>
+            <tr><td><code>featured</code></td><td><code>true</code>, <code>false</code> ({{ __('première ligne : une seule publication en pleine largeur') }})</td><td><code>{{ settings.default_featured ? 'true' : 'false' }}</code></td></tr>
+            <tr><td><code>layout</code></td><td><code>grid</code>, <code>list</code> ({{ __('une publication par ligne') }})</td><td><code>grid</code></td></tr>
+            <tr><td><code>limit</code></td><td>{{ __('nombre total, 1 – 50 (remplace columns × rows)') }}</td><td>—</td></tr>
             <tr><td><code>type</code></td><td><code>image</code>, <code>video</code>, <code>album</code>, <code>text</code></td><td>{{ __('tous') }}</td></tr>
             <tr><td><code>show_text</code> / <code>show_date</code> / <code>show_stats</code></td><td><code>true</code>, <code>false</code></td><td>true / true / false</td></tr>
             <tr><td><code>show_account</code></td><td><code>true</code>, <code>false</code>, <code>auto</code></td><td><code>auto</code> ({{ __('affiché si plusieurs Pages') }})</td></tr>
@@ -165,6 +183,32 @@
             <tr><td><code>template</code></td><td>{{ __('fichier Twig du thème (dossier rezos/)') }}</td><td><code>feed.html.twig</code></td></tr>
         </tbody>
     </table>
-    <p><code>[rezos source="instagram" limit="6" columns="3"]</code><br>
+    <p><code>[rezos source="instagram" columns="3" rows="2"]</code><br>
+       <code>[rezos featured="true" columns="4" rows="3"]</code><br>
        <code>[rezos page="@moncompte,123456789" show_stats="true"]</code></p>
+
+    <hr>
+
+    {# ─── 4. Aperçu ───────────────────────────────────────── #}
+    <h2 id="rezos-preview">{{ __('4. Aperçu') }}</h2>
+    {% if connected %}
+        <form method="get" action="{{ admin_url('options-general.php') }}#rezos-preview">
+            <input type="hidden" name="page" value="rezos">
+            <p>
+                <label for="rezos-preview-code" class="screen-reader-text">{{ __('Shortcode') }}</label>
+                <input id="rezos-preview-code" name="preview" type="text" class="large-text code" value="{{ preview_code }}">
+            </p>
+            <p><button type="submit" class="button">{{ __('Prévisualiser') }}</button></p>
+        </form>
+        <p class="description">{{ __('Rendu avec les styles du plugin ; sur le site, ceux du thème s’y ajoutent.') }}</p>
+        {% if preview_error %}
+            <div class="notice notice-error inline"><p>{{ preview_error }}</p></div>
+        {% elseif preview_html is not null %}
+            <div class="rezos-admin-preview" style="max-width:1100px;margin-top:1em;padding:1.5em;background:#fff;border:1px solid #c3c4c7">
+                {{ preview_html|raw }}
+            </div>
+        {% endif %}
+    {% else %}
+        <p class="description">{{ __('Connectez au moins une Page pour prévisualiser le flux.') }}</p>
+    {% endif %}
 </div>

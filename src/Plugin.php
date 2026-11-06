@@ -48,9 +48,11 @@ final class Plugin
             register_widget(Widget::class);
         });
 
-        add_action('wp_enqueue_scripts', static function (): void {
+        $registerStyle = static function (): void {
             wp_register_style('rezos', REZOS_URL . 'assets/rezos.css', [], REZOS_VERSION);
-        });
+        };
+        add_action('wp_enqueue_scripts', $registerStyle);
+        add_action('admin_enqueue_scripts', $registerStyle); // aperçu dans les réglages
 
         if (is_admin()) {
             (new SettingsPage($this))->register();
@@ -102,12 +104,13 @@ final class Plugin
             return;
         }
 
+        // Settings migre les anciens formats à la lecture ; on réenregistre pour supprimer
+        // les anciennes clés : page_id, page_token… (0.1 → 0.2), default_limit (0.2 → 1.0).
+        if (is_array(get_option(Settings::OPTION))) {
+            $this->settings()->update([]);
+        }
+
         if (version_compare($installed, '0.2.0', '<')) {
-            // 0.1 → 0.2 : une seule Page → liste « accounts ». Settings migre à la lecture ;
-            // on réenregistre pour supprimer les anciennes clés (page_id, page_token…).
-            if (is_array(get_option(Settings::OPTION))) {
-                $this->settings()->update([]);
-            }
             // Le cache n'était tenu que par source (« facebook »), il l'est désormais par source et par Page.
             FeedCache::forget('facebook');
             FeedCache::forget('instagram');

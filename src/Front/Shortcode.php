@@ -30,4 +30,19 @@ final class Shortcode
 
         return (new FeedRenderer($this->plugin))->render($atts);
     }
+
+    /**
+     * Attributs d'un shortcode saisi tel quel (« [rezos rows="2"] »), ou null s'il ne s'agit pas de [rezos].
+     *
+     * @return array<string, string>|null
+     */
+    public static function parse(string $text): ?array
+    {
+        if (!preg_match('/^\s*\[' . self::TAG . '(\s[^\]]*)?\]\s*$/', $text, $m)) {
+            return null;
+        }
+        $atts = shortcode_parse_atts(trim($m[1] ?? ''));
+
+        return is_array($atts) ? array_filter($atts, 'is_string', ARRAY_FILTER_USE_KEY) : [];
+    }
 }

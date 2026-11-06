@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rezos\Front;
 
 use Rezos\Plugin;
+use Rezos\Settings;
 use Symfony\Component\OptionsResolver\Exception\ExceptionInterface as OptionsException;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -51,16 +52,20 @@ final class FeedRenderer
         }
 
         $sources = $this->plugin->feed()->availableSources();
-        $accounts = $this->plugin->settings()->accounts();
+        $settings = $this->plugin->settings();
+        $accounts = $settings->accounts();
         $toBool = static fn (Options $o, mixed $v): bool => filter_var($v, FILTER_VALIDATE_BOOLEAN);
 
         $r = new OptionsResolver();
         $r->setDefaults([
             'source'    => 'all',
             'page'      => 'all',
-            'limit'     => (int) $this->plugin->settings()->get('default_limit'),
+            'columns'   => (int) $settings->get('default_columns'),
+            'rows'      => (int) $settings->get('default_rows'),
+            'featured'  => (bool) $settings->get('default_featured'),
+            // Déduit de columns × rows ; renseigné, il les remplace.
+            'limit'     => null,
             'layout'    => 'grid',
-            'columns'   => 3,
             'type'      => null,
             'show_text' => true,
             'show_date' => true,
@@ -119,8 +124,16 @@ final class FeedRenderer
 
             return filter_var($v, FILTER_VALIDATE_BOOLEAN);
         });
-        $r->setNormalizer('limit', static fn (Options $o, mixed $v): int => max(1, min(50, (int) $v)));
-        $r->setNormalizer('columns', static fn (Options $o, mixed $v): int => max(1, min(6, (int) $v)));
+        $r->setNormalizer('columns', static fn (Options $o, mixed $v): int => max(1, min(Settings::MAX_COLUMNS, (int) $v)));
+        $r->setNormalizer('rows', static fn (Options $o, mixed $v): int => max(1, min(Settings::MAX_ROWS, (int) $v)));
+        $r->setNormalizer('featured', $toBool);
+        $r->setNormalizer('limit', static function (Options $o, mixed $v): int {
+            if ($v !== null && $v !== '') {
+                return max(1, min(50, (int) $v));
+            }
+
+            return self::postCount($o['layout'], $o['columns'], $o['rows'], $o['featured']);
+        });
         $r->setNormalizer('excerpt', static fn (Options $o, mixed $v): int => max(0, (int) $v));
         $r->setNormalizer('type', static fn (Options $o, mixed $v): ?string => $v === null || $v === '' ? null : strtolower((string) $v));
         $r->setNormalizer('show_text', $toBool);
@@ -132,6 +145,19 @@ final class FeedRenderer
         $r->setAllowedValues('template', static fn (mixed $v): bool => is_string($v) && (bool) preg_match('/^[a-z0-9_\-]+\.html\.twig$/i', $v));
 
         return $this->resolver = $r;
+    }
+
+    /**
+     * Nombre de publications pour remplir la grille : en liste, une par ligne ;
+     * avec « featured », la première ligne n'en contient qu'une.
+     */
+    public static function postCount(string $layout, int $columns, int $rows, bool $featured): int
+    {
+        if ($layout === 'list') {
+            return $rows;
+        }
+
+        return $featured ? 1 + $columns * ($rows - 1) : $columns * $rows;
     }
 
     private function errorBox(string $message): string

@@ -20,8 +20,15 @@ final class Settings
         // Pages connectées : list<array{id, name, token, ig_id, ig_username}>
         'accounts'           => [],
         'cache_ttl'          => 3600,
-        'default_limit'      => 9,
+        // Grille par défaut : publications par ligne × nombre de lignes.
+        'default_columns'    => 3,
+        'default_rows'       => 3,
+        // Première ligne occupée par une seule publication, sur toute la largeur.
+        'default_featured'   => false,
     ];
+
+    public const MAX_COLUMNS = 6;
+    public const MAX_ROWS = 10;
 
     /** @var array<string, mixed>|null */
     private ?array $values = null;
@@ -100,7 +107,7 @@ final class Settings
     }
 
     /**
-     * Version 0.1 : une seule Page (page_id, page_token…) → liste « accounts ».
+     * Anciens formats : une seule Page (0.1) → liste « accounts » ; « default_limit » (0.2) → lignes.
      *
      * @param array<string, mixed> $stored
      * @return array<string, mixed>
@@ -115,6 +122,11 @@ final class Settings
                 'ig_id'       => (string) ($stored['ig_user_id'] ?? ''),
                 'ig_username' => (string) ($stored['ig_username'] ?? ''),
             ]];
+        }
+
+        // Version 0.2 : nombre total de publications → lignes de 3 colonnes.
+        if (!isset($stored['default_rows']) && isset($stored['default_limit'])) {
+            $stored['default_rows'] = max(1, min(self::MAX_ROWS, (int) ceil((int) $stored['default_limit'] / 3)));
         }
 
         // Les anciennes clés disparaîtront au prochain enregistrement (update() filtre sur DEFAULTS).

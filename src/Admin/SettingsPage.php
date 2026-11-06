@@ -6,8 +6,11 @@ namespace Rezos\Admin;
 
 use Rezos\Api\GraphException;
 use Rezos\Cache\FeedCache;
+use Rezos\Front\FeedRenderer;
+use Rezos\Front\Shortcode;
 use Rezos\Model\Account;
 use Rezos\Plugin;
+use Rezos\Settings;
 
 /**
  * Réglages > Rezos : identifiants de l'app Meta, connexion des Pages, cache.
@@ -25,6 +28,13 @@ final class SettingsPage
     {
         add_action('admin_menu', function (): void {
             add_options_page('Rezos', 'Rezos', self::CAP, self::SLUG, [$this, 'render']);
+        });
+
+        // Styles du flux pour l'aperçu (le style est enregistré par Plugin::boot sur ce même hook).
+        add_action('admin_enqueue_scripts', static function (string $hook): void {
+            if ($hook === 'settings_page_' . self::SLUG) {
+                wp_enqueue_style('rezos');
+            }
         });
 
         foreach (['save', 'connect', 'select_pages', 'remove_page', 'test', 'flush', 'disconnect'] as $action) {
@@ -56,6 +66,7 @@ final class SettingsPage
         delete_transient($this->noticeKey());
 
         echo $this->plugin->twig()->render('admin/settings.html.twig', [
+            ...$this->preview(),
             'settings'     => $this->plugin->settings()->all(),
             'accounts'     => $this->plugin->settings()->accounts(),
             'connected'    => $this->plugin->settings()->isConnected(),
@@ -73,7 +84,9 @@ final class SettingsPage
             'app_id'        => preg_replace('/\D/', '', (string) ($in['app_id'] ?? '')),
             'graph_version' => preg_match('/^v\d+\.\d+$/', (string) ($in['graph_version'] ?? '')) ? $in['graph_version'] : 'v25.0',
             'cache_ttl'     => max(300, (int) ($in['cache_ttl'] ?? 3600)),
-            'default_limit' => max(1, min(50, (int) ($in['default_limit'] ?? 9))),
+            'default_columns'  => max(1, min(Settings::MAX_COLUMNS, (int) ($in['default_columns'] ?? 3))),
+            'default_rows'     => max(1, min(Settings::MAX_ROWS, (int) ($in['default_rows'] ?? 3))),
+            'default_featured' => !empty($in['default_featured']),
         ];
         // Champ secret laissé vide = conserver la valeur actuelle.
         $secret = trim((string) ($in['app_secret'] ?? ''));
@@ -183,6 +196,29 @@ final class SettingsPage
         delete_transient($this->pendingKey());
         FeedCache::flushAll();
         $this->redirect('success', __('Toutes les Pages ont été déconnectées.', 'rezos'));
+    }
+
+    /**
+     * Aperçu du shortcode saisi dans la section « Aperçu » (paramètre GET « preview », lecture seule).
+     *
+     * @return array{preview_code: string, preview_html: ?string, preview_error: ?string}
+     */
+    private function preview(): array
+    {
+        $code = isset($_GET['preview']) ? trim(wp_unslash((string) $_GET['preview'])) : '';
+        $result = ['preview_code' => $code !== '' ? $code : '[' . Shortcode::TAG . ']', 'preview_html' => null, 'preview_error' => null];
+        if ($code === '' || !$this->plugin->settings()->isConnected()) {
+            return $result;
+        }
+
+        $atts = Shortcode::parse($code);
+        if ($atts === null) {
+            $result['preview_error'] = __('Saisissez un shortcode de la forme [rezos …].', 'rezos');
+        } else {
+            $result['preview_html'] = (new FeedRenderer($this->plugin))->render($atts);
+        }
+
+        return $result;
     }
 
     /**

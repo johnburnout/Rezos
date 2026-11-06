@@ -24,11 +24,15 @@
     </select>
 </p>
 <p>
-    <label for="{{ fields.limit.id }}">{{ __('Nombre :') }}</label>
-    <input class="tiny-text" id="{{ fields.limit.id }}" name="{{ fields.limit.name }}" type="number" min="1" max="50" value="{{ instance.limit }}">
-    &nbsp;
-    <label for="{{ fields.columns.id }}">{{ __('Colonnes :') }}</label>
+    <label for="{{ fields.columns.id }}">{{ __('Par ligne :') }}</label>
     <input class="tiny-text" id="{{ fields.columns.id }}" name="{{ fields.columns.name }}" type="number" min="1" max="6" value="{{ instance.columns }}">
+    &nbsp;
+    <label for="{{ fields.rows.id }}">{{ __('Lignes :') }}</label>
+    <input class="tiny-text" id="{{ fields.rows.id }}" name="{{ fields.rows.name }}" type="number" min="1" max="10" value="{{ instance.rows }}">
+</p>
+<p>
+    <input class="checkbox" id="{{ fields.featured.id }}" name="{{ fields.featured.name }}" type="checkbox" value="1" {{ instance.featured ? 'checked' }}>
+    <label for="{{ fields.featured.id }}">{{ __('Première publication en pleine largeur') }}</label>
 </p>
 <p>
     <label for="{{ fields.layout.id }}">{{ __('Disposition :') }}</label>

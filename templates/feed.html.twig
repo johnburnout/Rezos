@@ -10,7 +10,7 @@
     uid     : identifiant HTML unique
 #}
 <div id="{{ uid }}"
-     class="rezos rezos--{{ options.layout }}"
+     class="rezos rezos--{{ options.layout }}{{ options.featured ? ' rezos--featured' }}"
      style="--rezos-columns: {{ options.columns }}">
 
     {% for error in errors %}

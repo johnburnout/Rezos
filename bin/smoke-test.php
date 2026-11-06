@@ -67,7 +67,8 @@ define('MINUTE_IN_SECONDS', 60);
 // Réglages au format 0.1 (une seule Page) : ils doivent être migrés automatiquement.
 $GLOBALS['wp_options'] = [
     'rezos_settings' => ['page_id' => '111', 'page_name' => 'Boulangerie', 'page_token' => 'tok1',
-                         'ig_user_id' => '911', 'ig_username' => 'boulangerie', 'app_secret' => 's'],
+                         'ig_user_id' => '911', 'ig_username' => 'boulangerie', 'app_secret' => 's',
+                         'default_limit' => 9],
     // Cache au format 0.1 (par source uniquement) : doit être supprimé à la mise à jour.
     'rezos_stale_facebook'  => [['legacy']],
     'rezos_stale_instagram' => [['legacy']],
@@ -112,6 +113,12 @@ function wp_date(string $format, int $ts): string { return date($format, $ts); }
 function human_time_diff(int $from, int $to): string { return '1 jour'; }
 function admin_url(string $path = ''): string { return '/wp-admin/' . $path; }
 function wp_nonce_field(...$args): string { return ''; }
+function shortcode_parse_atts(string $text): array|string
+{
+    preg_match_all('/([\w-]+)\s*=\s*"([^"]*)"/', $text, $m, PREG_SET_ORDER);
+
+    return $text === '' ? '' : array_column($m, 2, 1);
+}
 
 // ---------------------------------------------------------------------------
 // 4. Chargement du plugin préfixé, comme WordPress le ferait.
@@ -121,10 +128,10 @@ require $build . '/rezos.php';
 do_action('plugins_loaded');
 check(isset($GLOBALS['wp_shortcodes']['rezos']), 'plugin amorcé, shortcode [rezos] enregistré');
 
-// Mise à jour 0.1 → 0.2 au démarrage.
+// Mise à jour 0.1 → 1.0 au démarrage.
 $opts = $GLOBALS['wp_options'];
 check(($opts['rezos_db_version'] ?? null) === REZOS_VERSION, 'mise à jour : version des données enregistrée (' . REZOS_VERSION . ')');
-check(!isset($opts['rezos_settings']['page_id']) && count($opts['rezos_settings']['accounts'] ?? []) === 1, 'mise à jour : réglages réenregistrés au format « accounts »');
+check(!isset($opts['rezos_settings']['page_id'], $opts['rezos_settings']['default_limit']) && count($opts['rezos_settings']['accounts'] ?? []) === 1, 'mise à jour : réglages réenregistrés au format « accounts »');
 check(!isset($opts['rezos_stale_facebook'], $opts['rezos_stale_instagram'])
     && !isset($GLOBALS['wp_transients']['rezos_feed_facebook'], $GLOBALS['wp_transients']['rezos_feed_instagram']),
     'mise à jour : ancien cache 0.1 supprimé');
@@ -135,6 +142,7 @@ $settings = Rezos\Plugin::instance()->settings();
 // Migration des réglages 0.1
 $legacy = $settings->accounts();
 check(count($legacy) === 1 && $legacy[0]->id === '111' && $legacy[0]->igUsername === 'boulangerie', 'réglages 0.1 migrés vers une liste de Pages');
+check($settings->get('default_rows') === 3 && $settings->get('default_columns') === 3 && $settings->get('default_limit') === null, 'default_limit=9 migré en 3 × 3');
 
 // Une Page seule : pas de nom de Page affiché (show_account auto).
 $post = static fn (string $source, string $id, string $date, string $type, string $account): array => [
@@ -154,6 +162,26 @@ check(strpos($html, 'ig1') < strpos($html, 'fb1'), 'une Page : tri par date déc
 check(str_contains($html, '&lt;b&gt;gras&lt;/b&gt;'), 'texte échappé par Twig');
 check(str_contains($html, '♥ 3'), 'statistiques (show_stats)');
 check(!str_contains($html, 'rezos-post__account'), 'une Page : nom de Page masqué par défaut');
+
+// Grille : colonnes × lignes, première ligne en pleine largeur.
+$count = static fn (string $html): int => substr_count($html, 'class="rezos__item"');
+$GLOBALS['wp_transients']['rezos_feed_facebook_111'] = array_map(
+    static fn (int $i): array => $post('facebook', "g$i", sprintf('2026-10-%02dT10:00:00+00:00', $i), 'image', '111'),
+    range(1, 20),
+);
+$html = $shortcode([]);
+check($count($html) === 9 && !str_contains($html, 'rezos--featured'), 'grille par défaut : 3 par ligne × 3 lignes = 9');
+$html = $shortcode(['columns' => '4', 'rows' => '2']);
+check($count($html) === 8 && str_contains($html, '--rezos-columns: 4'), 'columns="4" rows="2" : 8 publications');
+$html = $shortcode(['columns' => '3', 'rows' => '3', 'featured' => 'true']);
+check($count($html) === 7 && str_contains($html, 'rezos--featured'), 'featured : 1 + 3 + 3 = 7 publications');
+$html = $shortcode(['layout' => 'list', 'rows' => '4', 'columns' => '3']);
+check($count($html) === 4, 'layout="list" : une publication par ligne');
+check($count($shortcode(['limit' => '5', 'rows' => '4'])) === 5, 'limit remplace columns × rows');
+check(Rezos\Front\Shortcode::parse('[rezos rows="2" featured="true"]') === ['rows' => '2', 'featured' => 'true']
+    && Rezos\Front\Shortcode::parse(' [rezos] ') === []
+    && Rezos\Front\Shortcode::parse('[gallery ids="1"]') === null, 'aperçu : analyse du shortcode saisi');
+$GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [$post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111')];
 
 $error = $shortcode(['source' => 'tiktok']);
 check(str_contains($error, 'Source inconnue'), 'OptionsResolver préfixé : option invalide refusée');
@@ -185,17 +213,22 @@ $admin = $twig->render('admin/settings.html.twig', [
     'settings' => $settings->all(), 'accounts' => $settings->accounts(), 'connected' => true,
     'pending' => [['id' => '222', 'name' => 'Fromagerie', 'ig_username' => null], ['id' => '333', 'name' => 'Épicerie', 'ig_username' => 'epicerie']],
     'notice' => null, 'post_url' => '/wp-admin/admin-post.php', 'redirect_uri' => '/',
+    'preview_code' => '[rezos rows="1"]', 'preview_html' => '<div class="rezos">APERCU</div>', 'preview_error' => null,
 ]);
+check(str_contains($admin, 'name="default_rows"') && str_contains($admin, 'name="default_featured"'), 'admin : réglages colonnes / lignes / pleine largeur');
+check(str_contains($admin, '<div class="rezos">APERCU</div>') && str_contains($admin, 'value="[rezos rows=&quot;1&quot;]"'), 'admin : aperçu du shortcode');
+check(str_contains($admin, 'preview=%5Brezos%20page%3D%22222%22%5D'), 'admin : lien d\'aperçu par Page');
 check(str_contains($admin, '[rezos page="222"]') && str_contains($admin, '@boulangerie'), 'admin : liste des Pages connectées');
 check((bool) preg_match('/value="222"\s+checked/', $admin) && !preg_match('/value="333"\s+checked/', $admin), 'admin : Pages déjà connectées pré-cochées');
 $widget = $twig->render('admin/widget-form.html.twig', [
-    'instance' => ['title' => '', 'source' => 'all', 'page' => '222', 'limit' => 6, 'columns' => 3, 'layout' => 'grid', 'show_text' => false],
+    'instance' => ['title' => '', 'source' => 'all', 'page' => '222', 'columns' => 3, 'rows' => 2, 'featured' => true, 'layout' => 'grid', 'show_text' => false],
     'fields' => array_map(static fn (string $k): array => ['id' => $k, 'name' => $k], array_combine(
-        ['title', 'source', 'page', 'limit', 'columns', 'layout', 'show_text'], ['title', 'source', 'page', 'limit', 'columns', 'layout', 'show_text'],
+        $keys = ['title', 'source', 'page', 'columns', 'rows', 'featured', 'layout', 'show_text'], $keys,
     )),
     'accounts' => $settings->accounts(),
 ]);
 check((bool) preg_match('/value="222" selected/', $widget), 'widget : choix de la Page');
+check(str_contains($widget, 'name="rows"') && (bool) preg_match('/name="featured"[^>]*checked/', $widget), 'widget : lignes et pleine largeur');
 
 // Compilation Twig avec cache disque (le code généré doit utiliser les classes préfixées).
 $compiled = glob(WP_CONTENT_DIR . '/cache/rezos-twig/*/*.php') ?: [];

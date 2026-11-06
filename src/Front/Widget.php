@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rezos\Front;
 
 use Rezos\Plugin;
+use Rezos\Settings;
 
 /**
  * Widget classique (Apparence > Widgets).
@@ -15,8 +16,9 @@ final class Widget extends \WP_Widget
         'title'     => '',
         'source'    => 'all',
         'page'      => 'all',
-        'limit'     => 6,
         'columns'   => 3,
+        'rows'      => 2,
+        'featured'  => false,
         'layout'    => 'grid',
         'show_text' => false,
     ];
@@ -34,7 +36,7 @@ final class Widget extends \WP_Widget
      */
     public function widget($args, $instance): void
     {
-        $instance = array_merge(self::DEFAULTS, $instance);
+        $instance = self::withDefaults($instance);
         $title = apply_filters('widget_title', $instance['title'], $instance, $this->id_base);
 
         echo $args['before_widget'];
@@ -44,8 +46,9 @@ final class Widget extends \WP_Widget
         echo (new FeedRenderer(Plugin::instance()))->render([
             'source'    => $instance['source'],
             'page'      => $instance['page'],
-            'limit'     => $instance['limit'],
             'columns'   => $instance['columns'],
+            'rows'      => $instance['rows'],
+            'featured'  => $instance['featured'],
             'layout'    => $instance['layout'],
             'show_text' => $instance['show_text'],
         ]);
@@ -55,7 +58,7 @@ final class Widget extends \WP_Widget
     /** @param array<string, mixed> $instance */
     public function form($instance): string
     {
-        $instance = array_merge(self::DEFAULTS, $instance);
+        $instance = self::withDefaults($instance);
         $fields = [];
         foreach (array_keys(self::DEFAULTS) as $key) {
             $fields[$key] = ['id' => $this->get_field_id($key), 'name' => $this->get_field_name($key)];
@@ -81,10 +84,28 @@ final class Widget extends \WP_Widget
             'title'     => sanitize_text_field($new['title'] ?? ''),
             'source'    => in_array($new['source'] ?? '', ['all', 'facebook', 'instagram'], true) ? $new['source'] : 'all',
             'page'      => Plugin::instance()->settings()->account((string) ($new['page'] ?? '')) !== null ? (string) $new['page'] : 'all',
-            'limit'     => max(1, min(50, (int) ($new['limit'] ?? 6))),
-            'columns'   => max(1, min(6, (int) ($new['columns'] ?? 3))),
+            'columns'   => max(1, min(Settings::MAX_COLUMNS, (int) ($new['columns'] ?? 3))),
+            'rows'      => max(1, min(Settings::MAX_ROWS, (int) ($new['rows'] ?? 2))),
+            'featured'  => !empty($new['featured']),
             'layout'    => ($new['layout'] ?? '') === 'list' ? 'list' : 'grid',
             'show_text' => !empty($new['show_text']),
         ];
+    }
+
+    /**
+     * Widgets enregistrés avec l'ancien réglage « limit » (nombre total) → nombre de lignes.
+     *
+     * @param array<string, mixed> $instance
+     * @return array<string, mixed>
+     */
+    private static function withDefaults(array $instance): array
+    {
+        if (!isset($instance['rows']) && isset($instance['limit'])) {
+            $columns = max(1, (int) ($instance['columns'] ?? self::DEFAULTS['columns']));
+            $instance['rows'] = max(1, min(Settings::MAX_ROWS, (int) ceil((int) $instance['limit'] / $columns)));
+        }
+        unset($instance['limit']);
+
+        return array_merge(self::DEFAULTS, $instance);
     }
 }

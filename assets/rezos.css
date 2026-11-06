@@ -18,6 +18,10 @@
     grid-template-columns: repeat(var(--rezos-columns, 3), minmax(0, 1fr));
 }
 
+/* Première publication seule sur sa ligne, en pleine largeur */
+.rezos--featured .rezos__item:first-child { grid-column: 1 / -1; }
+.rezos--featured.rezos--grid .rezos__item:first-child .rezos-post__media { aspect-ratio: 16 / 9; }
+
 @media (max-width: 782px) {
     .rezos--grid .rezos__list { grid-template-columns: repeat(min(2, var(--rezos-columns, 3)), minmax(0, 1fr)); }
 }
@@ -100,6 +104,8 @@
 /* Disposition liste : image à gauche */
 .rezos--list .rezos-post__link { flex-direction: row; }
 .rezos--list .rezos-post__media { flex: 0 0 min(35%, 220px); }
+.rezos--featured.rezos--list .rezos__item:first-child .rezos-post__link { flex-direction: column; }
+.rezos--featured.rezos--list .rezos__item:first-child .rezos-post__media { flex: none; aspect-ratio: 16 / 9; }
 
 .rezos__empty { color: var(--rezos-muted); }
 

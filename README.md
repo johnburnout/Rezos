@@ -47,7 +47,8 @@ Shortcode :
 
 ```
 [rezos]
-[rezos source="instagram" limit="6" columns="3"]
+[rezos source="instagram" columns="3" rows="2"]
+[rezos featured="true" columns="4" rows="3"]
 [rezos source="facebook" layout="list" show_stats="true" excerpt="0"]
 [rezos page="123456789"]
 [rezos page="@moncompte,123456789" source="instagram"]
@@ -59,16 +60,22 @@ Sans attribut `page`, le flux mélange toutes les Pages connectées, triées par
 |---|---|---|
 | `page` | `all`, ou IDs de Pages et/ou comptes Instagram (`@nom`), séparés par des virgules | `all` |
 | `source` | `all`, `facebook`, `instagram`, `facebook,instagram` | `all` |
-| `limit` | 1–50 | réglage (9) |
-| `layout` | `grid`, `list` | `grid` |
-| `columns` | 1–6 | 3 |
+| `columns` | publications par ligne, 1–6 | réglage (3) |
+| `rows` | nombre de lignes, 1–10 | réglage (3) |
+| `featured` | `true` / `false` : première ligne avec une seule publication, en pleine largeur | réglage (`false`) |
+| `layout` | `grid`, `list` (une publication par ligne) | `grid` |
+| `limit` | nombre total, 1–50 — remplace `columns` × `rows` | — |
 | `type` | `image`, `video`, `album`, `text` | tous |
 | `show_text`, `show_date`, `show_stats` | `true` / `false` | true / true / false |
 | `show_account` | `true` / `false` / `auto` (nom de la Page ou `@compte`) | `auto` : affiché si plusieurs Pages |
 | `excerpt` | nb de caractères, 0 = complet | 140 |
 | `template` | nom d'un template Twig | `feed.html.twig` |
 
-Widget : *Apparence › Widgets › Rezos* (choix de la Page lorsque plusieurs sont connectées).
+Le nombre de publications affichées découle de la grille : `columns` × `rows`, ou `1 + columns × (rows − 1)` avec `featured="true"`.
+
+**Aperçu** : la section *Aperçu* de *Réglages › Rezos* affiche le rendu de n'importe quel shortcode `[rezos …]` (un lien « Aperçu » est aussi proposé pour chaque Page connectée).
+
+Widget : *Apparence › Widgets › Rezos* (publications par ligne, lignes, première publication en pleine largeur, choix de la Page lorsque plusieurs sont connectées).
 
 ## Personnaliser l'affichage
 
