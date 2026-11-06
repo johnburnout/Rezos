@@ -6,7 +6,6 @@ namespace Rezos\Admin;
 
 use Rezos\Api\GraphException;
 use Rezos\Cache\FeedCache;
-use Rezos\Front\FeedRenderer;
 use Rezos\Front\Shortcode;
 use Rezos\Model\Account;
 use Rezos\Plugin;
@@ -70,7 +69,7 @@ final class SettingsPage
             'settings'     => $this->plugin->settings()->all(),
             'accounts'     => $this->plugin->settings()->accounts(),
             'connected'    => $this->plugin->settings()->isConnected(),
-            'pending'      => get_transient($this->pendingKey()) ?: [],
+            'pending'      => $this->pendingPages(),
             'notice'       => is_array($notice) ? $notice : null,
             'post_url'     => admin_url('admin-post.php'),
             'redirect_uri' => home_url('/'),
@@ -82,7 +81,7 @@ final class SettingsPage
         $in = wp_unslash($_POST);
         $values = [
             'app_id'        => preg_replace('/\D/', '', (string) ($in['app_id'] ?? '')),
-            'graph_version' => preg_match('/^v\d+\.\d+$/', (string) ($in['graph_version'] ?? '')) ? $in['graph_version'] : 'v25.0',
+            'graph_version' => preg_match('/^v\d+\.\d+$/', (string) ($in['graph_version'] ?? '')) ? $in['graph_version'] : Settings::defaults()['graph_version'],
             'cache_ttl'     => max(300, (int) ($in['cache_ttl'] ?? 3600)),
             'default_columns'  => max(1, min(Settings::MAX_COLUMNS, (int) ($in['default_columns'] ?? 3))),
             'default_rows'     => max(1, min(Settings::MAX_ROWS, (int) ($in['default_rows'] ?? 3))),
@@ -104,17 +103,16 @@ final class SettingsPage
     {
         $settings = $this->plugin->settings();
         $appId = (string) $settings->get('app_id');
-        $secret = (string) $settings->get('app_secret');
         $token = trim(sanitize_text_field(wp_unslash((string) ($_POST['user_token'] ?? ''))));
 
-        if ($appId === '' || $secret === '' || $token === '') {
+        if ($appId === '' || (string) $settings->get('app_secret') === '' || $token === '') {
             $this->redirect('error', __("Renseignez l'App ID, l'App Secret et un token utilisateur.", 'rezos'));
         }
 
         try {
             $graph = $this->plugin->graph();
-            $longToken = $graph->exchangeForLongLivedUserToken($appId, $secret, $token);
-            $pages = $graph->listPages($longToken, $secret);
+            $longToken = $graph->exchangeForLongLivedUserToken($appId, $token);
+            $pages = $graph->listPages($longToken);
         } catch (GraphException $e) {
             $this->redirect('error', $e->getMessage());
         }
@@ -127,20 +125,21 @@ final class SettingsPage
             $this->savePages($pages, $pages);
         }
 
-        set_transient($this->pendingKey(), $pages, 10 * MINUTE_IN_SECONDS);
+        $pending = array_map(static fn (Account $p): array => $p->toArray(), $pages);
+        set_transient($this->pendingKey(), $pending, 10 * MINUTE_IN_SECONDS);
         $this->redirect('info', __('Choisissez les Pages à afficher.', 'rezos'));
     }
 
     /** Étape 2 (si plusieurs Pages) : choix des Pages. */
     private function handleSelectPages(): void
     {
-        $pages = get_transient($this->pendingKey());
-        if (!is_array($pages) || $pages === []) {
+        $pages = $this->pendingPages();
+        if ($pages === []) {
             $this->redirect('error', __('La sélection a expiré, recommencez la connexion.', 'rezos'));
         }
 
         $ids = array_map('strval', (array) wp_unslash($_POST['page_ids'] ?? []));
-        $selected = array_values(array_filter($pages, static fn (array $p): bool => in_array($p['id'], $ids, true)));
+        $selected = array_values(array_filter($pages, static fn (Account $p): bool => in_array($p->id, $ids, true)));
 
         $this->savePages($selected, $pages);
     }
@@ -215,7 +214,7 @@ final class SettingsPage
         if ($atts === null) {
             $result['preview_error'] = __('Saisissez un shortcode de la forme [rezos …].', 'rezos');
         } else {
-            $result['preview_html'] = (new FeedRenderer($this->plugin))->render($atts);
+            $result['preview_html'] = $this->plugin->renderer()->render($atts);
         }
 
         return $result;
@@ -225,23 +224,19 @@ final class SettingsPage
      * Enregistre la sélection. Les Pages proposées mais non cochées sont retirées ;
      * celles connectées avec un autre compte Facebook (absentes de la liste proposée) sont conservées.
      *
-     * @param list<array{id: string, name: string, access_token: string, ig_id: ?string, ig_username: ?string}> $selected
-     * @param list<array{id: string, name: string, access_token: string, ig_id: ?string, ig_username: ?string}> $offered
+     * @param list<Account> $selected
+     * @param list<Account> $offered
      */
     private function savePages(array $selected, array $offered): never
     {
         $settings = $this->plugin->settings();
-        $offeredIds = array_column($offered, 'id');
+        $offeredIds = array_map(static fn (Account $p): string => $p->id, $offered);
 
         $accounts = array_values(array_filter(
             $settings->accounts(),
             static fn (Account $a): bool => !in_array($a->id, $offeredIds, true),
         ));
-        foreach ($selected as $page) {
-            $accounts[] = Account::fromArray($page);
-        }
-
-        $settings->saveAccounts($accounts);
+        $settings->saveAccounts([...$accounts, ...$selected]);
         delete_transient($this->pendingKey());
         FeedCache::flushAll();
 
@@ -250,13 +245,27 @@ final class SettingsPage
         }
 
         $names = array_map(
-            static fn (array $p): string => $p['name'] . ($p['ig_username'] ? ' (@' . $p['ig_username'] . ')' : ''),
+            static fn (Account $p): string => $p->name . ($p->hasInstagram() ? ' (@' . $p->igUsername . ')' : ''),
             $selected,
         );
         $this->redirect('success', sprintf(
             _n('Page connectée : %s.', 'Pages connectées : %s.', count($selected), 'rezos'),
             implode(', ', $names),
         ));
+    }
+
+    /**
+     * Pages proposées après connexion, en attente de sélection.
+     *
+     * @return list<Account>
+     */
+    private function pendingPages(): array
+    {
+        $pending = get_transient($this->pendingKey());
+
+        return is_array($pending)
+            ? array_values(array_map(static fn (array $p): Account => Account::fromArray($p), array_filter($pending, 'is_array')))
+            : [];
     }
 
     private function guard(string $action): void

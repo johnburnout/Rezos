@@ -6,7 +6,6 @@ namespace Rezos\Api;
 
 use Rezos\Model\Account;
 use Rezos\Model\Post;
-use Rezos\Settings;
 
 /**
  * Publications d'une Page Facebook : GET /{page-id}/posts
@@ -14,10 +13,8 @@ use Rezos\Settings;
  */
 final class FacebookProvider implements PostProviderInterface
 {
-    public function __construct(
-        private readonly GraphClient $graph,
-        private readonly Settings $settings,
-    ) {
+    public function __construct(private readonly GraphClient $graph)
+    {
     }
 
     public function supports(Account $account): bool
@@ -27,24 +24,16 @@ final class FacebookProvider implements PostProviderInterface
 
     public function fetch(Account $account, int $limit): array
     {
-        $data = $this->graph->get(
+        $items = $this->graph->list(
             $account->id . '/posts',
-            [
-                'fields' => 'id,message,story,created_time,permalink_url,full_picture,'
-                    . 'attachments{media_type,type},'
-                    . 'reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0)',
-                'limit'  => min($limit, 100),
-            ],
+            'id,message,story,created_time,permalink_url,full_picture,'
+                . 'attachments{media_type,type},'
+                . 'reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0)',
+            $limit,
             $account->token,
-            (string) $this->settings->get('app_secret'),
         );
 
-        $posts = [];
-        foreach ($data['data'] ?? [] as $item) {
-            $posts[] = $this->map($item, $account);
-        }
-
-        return $posts;
+        return array_map(fn (array $item): Post => $this->map($item, $account), $items);
     }
 
     /** @param array<string, mixed> $item */

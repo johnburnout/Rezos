@@ -211,7 +211,7 @@ check(str_contains($error, 'Page inconnue'), 'page inconnue refusée');
 $twig = Rezos\Plugin::instance()->twig();
 $admin = $twig->render('admin/settings.html.twig', [
     'settings' => $settings->all(), 'accounts' => $settings->accounts(), 'connected' => true,
-    'pending' => [['id' => '222', 'name' => 'Fromagerie', 'ig_username' => null], ['id' => '333', 'name' => 'Épicerie', 'ig_username' => 'epicerie']],
+    'pending' => [new Rezos\Model\Account('222', 'Fromagerie', 't'), new Rezos\Model\Account('333', 'Épicerie', 't', '933', 'epicerie')],
     'notice' => null, 'post_url' => '/wp-admin/admin-post.php', 'redirect_uri' => '/',
     'preview_code' => '[rezos rows="1"]', 'preview_html' => '<div class="rezos">APERCU</div>', 'preview_error' => null,
 ]);
@@ -219,6 +219,7 @@ check(str_contains($admin, 'name="default_rows"') && str_contains($admin, 'name=
 check(str_contains($admin, '<div class="rezos">APERCU</div>') && str_contains($admin, 'value="[rezos rows=&quot;1&quot;]"'), 'admin : aperçu du shortcode');
 check(str_contains($admin, 'preview=%5Brezos%20page%3D%22222%22%5D'), 'admin : lien d\'aperçu par Page');
 check(str_contains($admin, '[rezos page="222"]') && str_contains($admin, '@boulangerie'), 'admin : liste des Pages connectées');
+check(str_contains($admin, 'Instagram @epicerie'), 'admin : Pages proposées (Account)');
 check((bool) preg_match('/value="222"\s+checked/', $admin) && !preg_match('/value="333"\s+checked/', $admin), 'admin : Pages déjà connectées pré-cochées');
 $widget = $twig->render('admin/widget-form.html.twig', [
     'instance' => ['title' => '', 'source' => 'all', 'page' => '222', 'columns' => 3, 'rows' => 2, 'featured' => true, 'layout' => 'grid', 'show_text' => false],
@@ -252,16 +253,18 @@ $mock = new RezosVendor\Symfony\Component\HttpClient\MockHttpClient(static funct
 
     return new RezosVendor\Symfony\Component\HttpClient\Response\MockResponse($json, ['http_code' => count($requests) === 2 ? 400 : 200]);
 });
-$graph = new Rezos\Api\GraphClient($mock, 'v25.0');
-check(($graph->get('me', [], 'tok', 's')['data'][0]['id'] ?? null) === '1', 'requête GET décodée');
+$graph = new Rezos\Api\GraphClient($mock, 'v25.0', 's');
+check(($graph->list('me/posts', 'id', 5, 'tok')[0]['id'] ?? null) === '1', 'requête GET décodée');
+check(str_contains($requests[0], 'appsecret_proof=' . hash_hmac('sha256', 'tok', 's')), 'appsecret_proof ajouté avec le secret du client');
 try {
     $graph->get('me', [], 'tok');
     check(false, 'erreur Graph convertie en GraphException');
 } catch (Rezos\Api\GraphException $e) {
     check($e->isAuthError(), 'erreur Graph convertie en GraphException (code 190)');
 }
-$pages = $graph->listPages('tok', 's');
-check(array_column($pages, 'id') === ['p1', 'p2'] && $pages[1]['ig_id'] === 'ig2', 'me/accounts : toutes les Pages (pagination)');
+$pages = $graph->listPages('tok');
+check(array_map(static fn ($p) => $p->id, $pages) === ['p1', 'p2'] && $pages[1]->igId === 'ig2' && $pages[0]->token === 't1' && !$pages[0]->hasInstagram(),
+    'me/accounts : toutes les Pages en Account (pagination)');
 check(str_contains($requests[3] ?? '', 'after=CUR') && count($requests) === 4, 'me/accounts : curseur « after » suivi, arrêt sans « next »');
 
 // ---------------------------------------------------------------------------

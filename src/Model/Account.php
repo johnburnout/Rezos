@@ -41,7 +41,7 @@ final class Account
         return new self(
             (string) ($data['id'] ?? ''),
             (string) ($data['name'] ?? ''),
-            (string) ($data['token'] ?? $data['access_token'] ?? ''),
+            (string) ($data['token'] ?? ''),
             (string) ($data['ig_id'] ?? ''),
             (string) ($data['ig_username'] ?? ''),
         );

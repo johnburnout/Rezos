@@ -28,7 +28,7 @@ final class Shortcode
         // Ignore les attributs positionnels ([rezos foo]) qui arrivent avec des clés numériques.
         $atts = is_array($atts) ? array_filter($atts, 'is_string', ARRAY_FILTER_USE_KEY) : [];
 
-        return (new FeedRenderer($this->plugin))->render($atts);
+        return $this->plugin->renderer()->render($atts);
     }
 
     /**

@@ -6,7 +6,6 @@ namespace Rezos\Api;
 
 use Rezos\Model\Account;
 use Rezos\Model\Post;
-use Rezos\Settings;
 
 /**
  * Médias du compte Instagram professionnel lié à la Page : GET /{ig-user-id}/media
@@ -14,10 +13,8 @@ use Rezos\Settings;
  */
 final class InstagramProvider implements PostProviderInterface
 {
-    public function __construct(
-        private readonly GraphClient $graph,
-        private readonly Settings $settings,
-    ) {
+    public function __construct(private readonly GraphClient $graph)
+    {
     }
 
     public function supports(Account $account): bool
@@ -27,22 +24,14 @@ final class InstagramProvider implements PostProviderInterface
 
     public function fetch(Account $account, int $limit): array
     {
-        $data = $this->graph->get(
+        $items = $this->graph->list(
             $account->igId . '/media',
-            [
-                'fields' => 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
-                'limit'  => min($limit, 100),
-            ],
+            'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
+            $limit,
             $account->token,
-            (string) $this->settings->get('app_secret'),
         );
 
-        $posts = [];
-        foreach ($data['data'] ?? [] as $item) {
-            $posts[] = $this->map($item, $account);
-        }
-
-        return $posts;
+        return array_map(fn (array $item): Post => $this->map($item, $account), $items);
     }
 
     /** @param array<string, mixed> $item */

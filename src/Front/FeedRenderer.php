@@ -7,6 +7,7 @@ namespace Rezos\Front;
 use Rezos\Plugin;
 use Rezos\Settings;
 use Symfony\Component\OptionsResolver\Exception\ExceptionInterface as OptionsException;
+use Symfony\Component\OptionsResolver\Exception\InvalidOptionsException;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -53,7 +54,6 @@ final class FeedRenderer
 
         $sources = $this->plugin->feed()->availableSources();
         $settings = $this->plugin->settings();
-        $accounts = $settings->accounts();
         $toBool = static fn (Options $o, mixed $v): bool => filter_var($v, FILTER_VALIDATE_BOOLEAN);
 
         $r = new OptionsResolver();
@@ -83,7 +83,7 @@ final class FeedRenderer
             }
             $unknown = array_diff($list, $sources);
             if ($unknown !== []) {
-                throw new \Symfony\Component\OptionsResolver\Exception\InvalidOptionsException(
+                throw new InvalidOptionsException(
                     sprintf('Source inconnue « %s ». Valeurs possibles : all, %s.', implode(', ', $unknown), implode(', ', $sources)),
                 );
             }
@@ -92,7 +92,8 @@ final class FeedRenderer
         });
         // « all », ou une liste d'IDs de Pages et/ou de comptes Instagram (« @nom » ou « nom »).
         // Résultat : null (toutes les Pages) ou liste d'IDs de Pages.
-        $r->setNormalizer('page', static function (Options $o, mixed $v) use ($accounts): ?array {
+        // Les comptes sont relus à chaque appel : le résolveur est partagé et ils peuvent changer.
+        $r->setNormalizer('page', static function (Options $o, mixed $v) use ($settings): ?array {
             $list = array_filter(array_map('trim', explode(',', strtolower((string) $v))));
             if ($list === [] || in_array('all', $list, true)) {
                 return null;
@@ -100,14 +101,14 @@ final class FeedRenderer
             $ids = [];
             foreach ($list as $wanted) {
                 $match = null;
-                foreach ($accounts as $account) {
+                foreach ($settings->accounts() as $account) {
                     if ($wanted === $account->id || ($account->igUsername !== '' && ltrim($wanted, '@') === strtolower($account->igUsername))) {
                         $match = $account->id;
                         break;
                     }
                 }
                 if ($match === null) {
-                    throw new \Symfony\Component\OptionsResolver\Exception\InvalidOptionsException(
+                    throw new InvalidOptionsException(
                         sprintf('Page inconnue « %s ». Indiquez l\'ID d\'une Page connectée ou un compte Instagram (@nom).', $wanted),
                     );
                 }
@@ -117,9 +118,9 @@ final class FeedRenderer
             return array_values(array_unique($ids));
         });
         // Par défaut, le nom de la Page n'est affiché que si le flux en mélange plusieurs.
-        $r->setNormalizer('show_account', static function (Options $o, mixed $v) use ($accounts): bool {
+        $r->setNormalizer('show_account', static function (Options $o, mixed $v) use ($settings): bool {
             if ($v === null || $v === '' || $v === 'auto') {
-                return count($o['page'] ?? $accounts) > 1;
+                return count($o['page'] ?? $settings->accounts()) > 1;
             }
 
             return filter_var($v, FILTER_VALIDATE_BOOLEAN);

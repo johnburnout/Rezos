@@ -43,7 +43,7 @@ final class Widget extends \WP_Widget
         if ($title !== '') {
             echo $args['before_title'] . esc_html($title) . $args['after_title'];
         }
-        echo (new FeedRenderer(Plugin::instance()))->render([
+        echo Plugin::instance()->renderer()->render([
             'source'    => $instance['source'],
             'page'      => $instance['page'],
             'columns'   => $instance['columns'],
@@ -82,7 +82,7 @@ final class Widget extends \WP_Widget
     {
         return [
             'title'     => sanitize_text_field($new['title'] ?? ''),
-            'source'    => in_array($new['source'] ?? '', ['all', 'facebook', 'instagram'], true) ? $new['source'] : 'all',
+            'source'    => in_array($new['source'] ?? '', Plugin::instance()->feed()->availableSources(), true) ? $new['source'] : 'all',
             'page'      => Plugin::instance()->settings()->account((string) ($new['page'] ?? '')) !== null ? (string) $new['page'] : 'all',
             'columns'   => max(1, min(Settings::MAX_COLUMNS, (int) ($new['columns'] ?? 3))),
             'rows'      => max(1, min(Settings::MAX_ROWS, (int) ($new['rows'] ?? 2))),

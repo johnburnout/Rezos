@@ -10,6 +10,7 @@ use Rezos\Api\GraphClient;
 use Rezos\Api\InstagramProvider;
 use Rezos\Cache\FeedCache;
 use Rezos\Feed\FeedService;
+use Rezos\Front\FeedRenderer;
 use Rezos\Front\Shortcode;
 use Rezos\Front\Widget;
 use Rezos\Twig\TwigFactory;
@@ -29,6 +30,7 @@ final class Plugin
     private ?Settings $settings = null;
     private ?GraphClient $graph = null;
     private ?FeedService $feed = null;
+    private ?FeedRenderer $renderer = null;
     private ?Environment $twig = null;
 
     public static function instance(): self
@@ -69,6 +71,7 @@ final class Plugin
         return $this->graph ??= new GraphClient(
             HttpClient::create(['timeout' => 10]),
             (string) $this->settings()->get('graph_version'),
+            (string) $this->settings()->get('app_secret'),
         );
     }
 
@@ -78,8 +81,8 @@ final class Plugin
             $settings = $this->settings();
             $this->feed = new FeedService(
                 [
-                    'facebook'  => new FacebookProvider($this->graph(), $settings),
-                    'instagram' => new InstagramProvider($this->graph(), $settings),
+                    'facebook'  => new FacebookProvider($this->graph()),
+                    'instagram' => new InstagramProvider($this->graph()),
                 ],
                 new FeedCache((int) $settings->get('cache_ttl')),
                 $settings,
@@ -87,6 +90,11 @@ final class Plugin
         }
 
         return $this->feed;
+    }
+
+    public function renderer(): FeedRenderer
+    {
+        return $this->renderer ??= new FeedRenderer($this);
     }
 
     public function twig(): Environment

@@ -73,7 +73,7 @@
                         <input type="checkbox" name="page_ids[]" value="{{ page.id }}"
                                {{ connected_ids is empty or page.id in connected_ids ? 'checked' }}>
                         <strong>{{ page.name }}</strong>
-                        {% if page.ig_username %}— Instagram @{{ page.ig_username }}{% endif %}
+                        {% if page.hasInstagram %}— Instagram @{{ page.igUsername }}{% endif %}
                     </label>
                 {% endfor %}
             </fieldset>
