@@ -17,6 +17,9 @@ final class Updater
     public const REPO = 'johnburnout/Rezos';
     public const SLUG = 'rezos';
 
+    /** Dernière branche de WordPress sur laquelle Rezos a été vérifié (« Testé jusqu'à »). */
+    public const TESTED_UP_TO = '7.1';
+
     private const CACHE_KEY = 'rezos_latest_release';
     private const CACHE_TTL = 6 * 3600;
     private const ERROR_TTL = 3600;
@@ -61,6 +64,7 @@ final class Updater
             'package'      => $release['package'],
             'requires'     => '6.0',
             'requires_php' => '8.1',
+            'tested'       => self::tested(),
         ];
     }
 
@@ -85,11 +89,25 @@ final class Updater
             'download_link' => $release['package'],
             'requires'      => '6.0',
             'requires_php'  => '8.1',
+            'tested'        => self::tested(),
             'last_updated'  => $release['date'],
             'sections'      => [
                 'changelog' => self::markdownToHtml($release['notes']),
             ],
         ];
+    }
+
+    /**
+     * Version « testée » annoncée à WordPress, sinon il affiche « Compatibilité : non testée ».
+     * WordPress compare la version complète (7.1 < 7.1.4) : comme wordpress.org, une branche
+     * testée couvre ses versions de maintenance, on renvoie donc la version du site si elle en fait partie.
+     */
+    public static function tested(): string
+    {
+        $current = (string) ($GLOBALS['wp_version'] ?? '');
+        $branch = implode('.', array_slice(explode('.', $current), 0, 2));
+
+        return $branch === self::TESTED_UP_TO ? $current : self::TESTED_UP_TO;
     }
 
     public static function flush(): void

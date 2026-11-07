@@ -19,8 +19,11 @@
 }
 
 /* Première publication seule sur sa ligne, en pleine largeur */
-.rezos--featured .rezos__item:first-child { grid-column: 1 / -1; }
-.rezos--featured.rezos--grid .rezos__item:first-child .rezos-post__media { aspect-ratio: 16 / 9; }
+.rezos--featured .rezos__list:first-of-type .rezos__item:first-child { grid-column: 1 / -1; }
+.rezos--featured.rezos--grid .rezos__list:first-of-type .rezos__item:first-child .rezos-post__media { aspect-ratio: 16 / 9; }
+
+/* Pages masquées (pagination) : l'attribut hidden doit l'emporter sur display: grid */
+.rezos [hidden] { display: none !important; }
 
 @media (max-width: 782px) {
     .rezos--grid .rezos__list { grid-template-columns: repeat(min(2, var(--rezos-columns, 3)), minmax(0, 1fr)); }
@@ -147,3 +150,25 @@
 .rezos-follow--instagram .rezos-follow__label { color: #d62976; }
 .rezos-follow__account,
 .rezos-follow__count { color: var(--rezos-muted); font-size: .9em; }
+
+/* Pagination : publications suivantes / précédentes */
+.rezos__pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem var(--rezos-gap);
+    margin-top: var(--rezos-gap);
+}
+.rezos__pager-button {
+    padding: .4rem .9rem;
+    border: 1px solid var(--rezos-border);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+.rezos__pager-button:hover { border-color: currentColor; }
+.rezos__pager-button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.rezos__pager-status { color: var(--rezos-muted); font-size: .9em; }

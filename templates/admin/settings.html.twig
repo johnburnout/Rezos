@@ -52,6 +52,16 @@
                 </td>
             </tr>
             <tr>
+                <th scope="row">{{ __('Pagination') }}</th>
+                <td>
+                    <label>
+                        <input name="default_pagination" type="checkbox" value="1" {{ settings.default_pagination ? 'checked' }}>
+                        {{ __('Boutons « Publications suivantes / précédentes » sous le flux') }}
+                    </label>
+                    <p class="description">{{ __('Modifiable pour chaque shortcode avec l\'attribut pagination.') }}</p>
+                </td>
+            </tr>
+            <tr>
                 <th scope="row">{{ __('Nous suivre') }}</th>
                 <td>
                     <label>
@@ -184,6 +194,7 @@
             <tr><td><code>columns</code></td><td>{{ __('publications par ligne') }}, 1 – 6</td><td>{{ settings.default_columns }}</td></tr>
             <tr><td><code>rows</code></td><td>{{ __('nombre de lignes') }}, 1 – 10</td><td>{{ settings.default_rows }}</td></tr>
             <tr><td><code>featured</code></td><td><code>true</code>, <code>false</code> ({{ __('première ligne : une seule publication en pleine largeur') }})</td><td><code>{{ settings.default_featured ? 'true' : 'false' }}</code></td></tr>
+            <tr><td><code>pagination</code></td><td><code>true</code>, <code>false</code> ({{ __('boutons « Publications suivantes / précédentes »') }})</td><td><code>{{ settings.default_pagination ? 'true' : 'false' }}</code></td></tr>
             <tr><td><code>follow</code></td><td><code>true</code>, <code>false</code> ({{ __('barre « Nous suivre » avec le nombre d\'abonnés') }})</td><td><code>{{ settings.default_follow ? 'true' : 'false' }}</code></td></tr>
             <tr><td><code>layout</code></td><td><code>grid</code>, <code>list</code> ({{ __('une publication par ligne') }})</td><td><code>grid</code></td></tr>
             <tr><td><code>limit</code></td><td>{{ __('nombre total, 1 – 50 (remplace columns × rows)') }}</td><td>—</td></tr>

@@ -16,6 +16,9 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  */
 final class FeedRenderer
 {
+    /** Avec la pagination : nombre maximal de publications chargées (toutes pages confondues). */
+    public const MAX_PAGINATED = 60;
+
     private ?OptionsResolver $resolver = null;
 
     public function __construct(private readonly Plugin $plugin)
@@ -32,13 +35,27 @@ final class FeedRenderer
         }
 
         $feed = $this->plugin->feed();
-        $posts = $feed->getPosts($opts['source'], $opts['limit'], $opts['type'], $opts['page']);
+        if ($opts['pagination']) {
+            // Pages suivantes : grille pleine (la publication en pleine largeur n'est que sur la première),
+            // ou autant que « limit » s'il est renseigné.
+            $explicitLimit = isset($options['limit']) && $options['limit'] !== '' && $options['limit'] !== null;
+            $perPage = $explicitLimit ? $opts['limit'] : self::postCount($opts['layout'], $opts['columns'], $opts['rows'], false);
+            $all = $feed->getPosts($opts['source'], self::MAX_PAGINATED, $opts['type'], $opts['page']);
+            $pages = self::paginate($all, $opts['limit'], $perPage);
+        } else {
+            $pages = [$feed->getPosts($opts['source'], $opts['limit'], $opts['type'], $opts['page'])];
+        }
+        $posts = $pages[0] ?? [];
         $profiles = $opts['follow'] ? $feed->profiles($opts['page']) : [];
 
         wp_enqueue_style('rezos');
+        if (count($pages) > 1) {
+            wp_enqueue_script('rezos');
+        }
 
         $html = $this->plugin->twig()->render($opts['template'], [
             'posts'    => $posts,
+            'pages'    => $pages,
             'profiles' => $profiles,
             'options'  => $opts,
             'errors'   => current_user_can('manage_options') ? $feed->lastErrors() : [],
@@ -73,6 +90,8 @@ final class FeedRenderer
             'show_date' => true,
             'show_stats'=> false,
             'show_account' => null,
+            // Boutons « Publications suivantes / précédentes ».
+            'pagination'=> (bool) $settings->get('default_pagination'),
             // Barre « Nous suivre sur Facebook / Instagram » en bas du flux.
             'follow'    => (bool) $settings->get('default_follow'),
             'excerpt'   => 140,
@@ -145,6 +164,7 @@ final class FeedRenderer
         $r->setNormalizer('show_date', $toBool);
         $r->setNormalizer('show_stats', $toBool);
         $r->setNormalizer('follow', $toBool);
+        $r->setNormalizer('pagination', $toBool);
         $r->setAllowedValues('layout', ['grid', 'list']);
         $r->setAllowedValues('type', [null, 'image', 'video', 'album', 'text']);
         // Un nom de fichier simple : pas de remontée de répertoire.
@@ -164,6 +184,21 @@ final class FeedRenderer
         }
 
         return $featured ? 1 + $columns * ($rows - 1) : $columns * $rows;
+    }
+
+    /**
+     * Découpe en pages : $first publications sur la première, $perPage sur les suivantes.
+     *
+     * @template T
+     * @param list<T> $posts
+     * @return list<list<T>>
+     */
+    public static function paginate(array $posts, int $first, int $perPage): array
+    {
+        $pages = [array_slice($posts, 0, max(1, $first))];
+        $rest = array_slice($posts, max(1, $first));
+
+        return $rest === [] ? $pages : [...$pages, ...array_chunk($rest, max(1, $perPage))];
     }
 
     private function errorBox(string $message): string

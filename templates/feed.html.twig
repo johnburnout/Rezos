@@ -5,6 +5,7 @@
   Variables :
     posts   : liste de Rezos\Model\Post (source, id, text, imageUrl, mediaType, permalink, createdAt, likes, comments,
               accountId, accountName = nom de la Page ou @compte Instagram)
+    pages   : publications découpées en pages (pagination="true") ; une seule page sinon. posts = première page.
     profiles: liste de Rezos\Model\Profile (source, name, url, followers) pour la barre « Nous suivre »,
               vide si follow="false"
     options : options résolues du shortcode / widget
@@ -22,13 +23,28 @@
     {% if posts is empty %}
         <p class="rezos__empty">{{ __('Aucune publication pour le moment.') }}</p>
     {% else %}
-        <ul class="rezos__list">
-            {% for post in posts %}
-                <li class="rezos__item">
-                    {% include '_post.html.twig' with { post: post, options: options } only %}
-                </li>
-            {% endfor %}
-        </ul>
+        {% for page in pages %}
+            <ul class="rezos__list" data-rezos-page="{{ loop.index }}"{{ not loop.first ? ' hidden' }}>
+                {% for post in page %}
+                    <li class="rezos__item">
+                        {% include '_post.html.twig' with { post: post, options: options } only %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+
+        {% if pages|length > 1 %}
+            {# Affiché par assets/rezos.js ; sans JavaScript, seule la première page est visible. #}
+            <nav class="rezos__pager" aria-label="{{ __('Pages de publications') }}" hidden>
+                <button type="button" class="rezos__pager-button rezos__pager-button--prev" data-rezos-step="-1" hidden>
+                    <span aria-hidden="true">←</span> {{ __('Publications précédentes') }}
+                </button>
+                <span class="rezos__pager-status" aria-live="polite">1 / {{ pages|length }}</span>
+                <button type="button" class="rezos__pager-button rezos__pager-button--next" data-rezos-step="1">
+                    {{ __('Publications suivantes') }} <span aria-hidden="true">→</span>
+                </button>
+            </nav>
+        {% endif %}
     {% endif %}
 
     {% if profiles is not empty %}

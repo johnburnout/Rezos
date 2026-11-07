@@ -22,6 +22,7 @@ final class Widget extends \WP_Widget
         'layout'    => 'grid',
         'show_text' => false,
         'follow'    => true,
+        'pagination'=> false,
     ];
 
     public function __construct()
@@ -53,6 +54,7 @@ final class Widget extends \WP_Widget
             'layout'    => $instance['layout'],
             'show_text' => $instance['show_text'],
             'follow'    => $instance['follow'],
+            'pagination'=> $instance['pagination'],
         ]);
         echo $args['after_widget'];
     }
@@ -92,6 +94,7 @@ final class Widget extends \WP_Widget
             'layout'    => ($new['layout'] ?? '') === 'list' ? 'list' : 'grid',
             'show_text' => !empty($new['show_text']),
             'follow'    => !empty($new['follow']),
+            'pagination'=> !empty($new['pagination']),
         ];
     }
 

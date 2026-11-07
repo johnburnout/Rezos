@@ -54,11 +54,13 @@ final class Plugin
             register_widget(Widget::class);
         });
 
-        $registerStyle = static function (): void {
+        $registerAssets = static function (): void {
             wp_register_style('rezos', REZOS_URL . 'assets/rezos.css', [], REZOS_VERSION);
+            // Pagination du flux, chargé seulement si un flux a plusieurs pages.
+            wp_register_script('rezos', REZOS_URL . 'assets/rezos.js', [], REZOS_VERSION, ['in_footer' => true, 'strategy' => 'defer']);
         };
-        add_action('wp_enqueue_scripts', $registerStyle);
-        add_action('admin_enqueue_scripts', $registerStyle); // aperçu dans les réglages
+        add_action('wp_enqueue_scripts', $registerAssets);
+        add_action('admin_enqueue_scripts', $registerAssets); // aperçu dans les réglages
 
         if (is_admin()) {
             (new SettingsPage($this))->register();

@@ -23,6 +23,8 @@ Depuis la 1.2.0, Rezos se met à jour comme les autres extensions : dès qu'une 
 
 Seules les releases publiées qui contiennent le zip `rezos-<version>.zip` sont proposées (pas les brouillons ni les pré-versions). Les réglages sont conservés et migrés si besoin.
 
+La compatibilité affichée (« Testé jusqu'à ») vient de `Updater::TESTED_UP_TO` (branche de WordPress, ex. `7.1`, qui couvre 7.1.x) : à relever après vérification sur une nouvelle version majeure de WordPress.
+
 Pour passer d'une version antérieure à la 1.2.0, téléversez une fois le zip à la main : WordPress propose de remplacer l'extension existante.
 
 ### Depuis les sources (développement)
@@ -73,6 +75,7 @@ Les **republications** sur un même réseau (même Page, même texte, à moins d
 | `columns` | publications par ligne, 1–6 | réglage (3) |
 | `rows` | nombre de lignes, 1–10 | réglage (3) |
 | `featured` | `true` / `false` : première ligne avec une seule publication, en pleine largeur | réglage (`false`) |
+| `pagination` | `true` / `false` : boutons « Publications suivantes / précédentes » sous le flux (jusqu'à 60 publications) | réglage (`false`) |
 | `follow` | `true` / `false` : barre « Nous suivre sur Facebook / Instagram » avec le nombre d'abonnés, en bas du flux | réglage (`true`) |
 | `layout` | `grid`, `list` (une publication par ligne) | `grid` |
 | `limit` | nombre total, 1–50 — remplace `columns` × `rows` | — |
@@ -84,11 +87,13 @@ Les **republications** sur un même réseau (même Page, même texte, à moins d
 
 Le nombre de publications affichées découle de la grille : `columns` × `rows`, ou `1 + columns × (rows − 1)` avec `featured="true"`.
 
+**Pagination** : avec `pagination="true"`, les publications suivantes (jusqu'à 60 au total) sont chargées d'avance et affichées page par page, sans rechargement, par les boutons « Publications suivantes » et « Publications précédentes » (la seconde apparaît dès la page 2). Chaque page reprend la grille (`columns` × `rows`, ou `limit`) ; la publication en pleine largeur n'est que sur la première. Sans JavaScript, seule la première page est visible.
+
 **Nous suivre** : en bas du flux, un lien vers la Page Facebook et un vers le compte Instagram de chaque Page affichée, avec leur nombre d'abonnés (mis en cache comme les publications). Désactivable dans *Réglages › Rezos*, pour chaque shortcode (`follow="false"`) ou dans le widget.
 
 **Aperçu** : la section *Aperçu* de *Réglages › Rezos* affiche le rendu de n'importe quel shortcode `[rezos …]` (un lien « Aperçu » est aussi proposé pour chaque Page connectée).
 
-Widget : *Apparence › Widgets › Rezos* (publications par ligne, lignes, première publication en pleine largeur, barre « Nous suivre », choix de la Page lorsque plusieurs sont connectées).
+Widget : *Apparence › Widgets › Rezos* (publications par ligne, lignes, première publication en pleine largeur, pagination, barre « Nous suivre », choix de la Page lorsque plusieurs sont connectées).
 
 ## Personnaliser l'affichage
 
@@ -124,7 +129,7 @@ scoper.inc.php            config PHP-Scoper
 bin/build.sh              build préfixé + zip
 bin/smoke-test.php        test du build
 templates/                feed, _post, admin/*
-assets/rezos.css
+assets/rezos.css, rezos.js  styles, pagination
 ```
 
 ## Build distribuable (dépendances préfixées)

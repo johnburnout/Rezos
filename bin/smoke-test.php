@@ -103,6 +103,8 @@ function get_template_directory(): string { return '/nonexistent'; }
 function wp_mkdir_p(string $dir): bool { return is_dir($dir) || mkdir($dir, 0777, true); }
 function wp_register_style(...$args): void {}
 function wp_enqueue_style(string $handle): void {}
+function wp_register_script(...$args): void {}
+function wp_enqueue_script(string $handle): void { $GLOBALS['wp_scripts_enqueued'][$handle] = true; }
 function wp_unique_id(string $prefix = ''): string { static $i = 0; return $prefix . ++$i; }
 function __(string $text, string $domain = 'default'): string { return $text; }
 function _n(string $s, string $p, int $n, string $domain = 'default'): string { return $n === 1 ? $s : $p; }
@@ -198,6 +200,24 @@ check($count($html) === 7 && str_contains($html, 'rezos--featured'), 'featured :
 $html = $shortcode(['layout' => 'list', 'rows' => '4', 'columns' => '3']);
 check($count($html) === 4, 'layout="list" : une publication par ligne');
 check($count($shortcode(['limit' => '5', 'rows' => '4'])) === 5, 'limit remplace columns × rows');
+
+// Pagination (21 publications en cache : 20 Facebook + 1 Instagram).
+$lists = static fn (string $html): int => substr_count($html, 'class="rezos__list"');
+$GLOBALS['wp_scripts_enqueued'] = [];
+$html = $shortcode(['columns' => '3', 'rows' => '2']);
+check($lists($html) === 1 && !str_contains($html, 'rezos__pager') && $GLOBALS['wp_scripts_enqueued'] === [],
+    'sans pagination (défaut) : une seule page, pas de script');
+$html = $shortcode(['columns' => '3', 'rows' => '2', 'pagination' => 'true']);
+check($lists($html) === 4 && $count($html) === 21 && substr_count($html, 'data-rezos-page="2" hidden') === 1,
+    'pagination : 21 publications en pages de 6, pages suivantes masquées');
+check(str_contains($html, 'Publications suivantes') && str_contains($html, 'Publications précédentes') && str_contains($html, '1 / 4')
+    && isset($GLOBALS['wp_scripts_enqueued']['rezos']), 'pagination : boutons suivantes / précédentes et script chargé');
+$html = $shortcode(['columns' => '3', 'rows' => '3', 'featured' => 'true', 'pagination' => 'true']);
+check($lists($html) === 3 && str_contains($html, '1 / 3'), 'pagination + featured : 7 puis 9 par page');
+check(Rezos\Front\FeedRenderer::paginate(range(1, 10), 4, 3) === [[1, 2, 3, 4], [5, 6, 7], [8, 9, 10]]
+    && Rezos\Front\FeedRenderer::paginate([1, 2], 4, 3) === [[1, 2]], 'pagination : découpage en pages');
+check(!str_contains($shortcode(['rows' => '10', 'columns' => '6', 'pagination' => 'true']), 'rezos__pager'),
+    'pagination : tout tient sur une page → pas de boutons');
 check(Rezos\Front\Shortcode::parse('[rezos rows="2" featured="true"]') === ['rows' => '2', 'featured' => 'true']
     && Rezos\Front\Shortcode::parse(' [rezos] ') === []
     && Rezos\Front\Shortcode::parse('[gallery ids="1"]') === null, 'aperçu : analyse du shortcode saisi');
@@ -282,21 +302,23 @@ $admin = $twig->render('admin/settings.html.twig', [
 ]);
 check(str_contains($admin, 'name="default_rows"') && str_contains($admin, 'name="default_featured"'), 'admin : réglages colonnes / lignes / pleine largeur');
 check((bool) preg_match('/name="default_follow"[^>]*checked/', $admin), 'admin : réglage « Nous suivre », activé par défaut');
+check(str_contains($admin, 'name="default_pagination"') && !preg_match('/name="default_pagination"[^>]*checked/', $admin), 'admin : pagination désactivée par défaut');
 check(str_contains($admin, '<div class="rezos">APERCU</div>') && str_contains($admin, 'value="[rezos rows=&quot;1&quot;]"'), 'admin : aperçu du shortcode');
 check(str_contains($admin, 'preview=%5Brezos%20page%3D%22222%22%5D'), 'admin : lien d\'aperçu par Page');
 check(str_contains($admin, '[rezos page="222"]') && str_contains($admin, '@boulangerie'), 'admin : liste des Pages connectées');
 check(str_contains($admin, 'Instagram @epicerie'), 'admin : Pages proposées (Account)');
 check((bool) preg_match('/value="222"\s+checked/', $admin) && !preg_match('/value="333"\s+checked/', $admin), 'admin : Pages déjà connectées pré-cochées');
 $widget = $twig->render('admin/widget-form.html.twig', [
-    'instance' => ['title' => '', 'source' => 'all', 'page' => '222', 'columns' => 3, 'rows' => 2, 'featured' => true, 'layout' => 'grid', 'show_text' => false, 'follow' => true],
+    'instance' => ['title' => '', 'source' => 'all', 'page' => '222', 'columns' => 3, 'rows' => 2, 'featured' => true, 'layout' => 'grid', 'show_text' => false, 'follow' => true, 'pagination' => true],
     'fields' => array_map(static fn (string $k): array => ['id' => $k, 'name' => $k], array_combine(
-        $keys = ['title', 'source', 'page', 'columns', 'rows', 'featured', 'layout', 'show_text', 'follow'], $keys,
+        $keys = ['title', 'source', 'page', 'columns', 'rows', 'featured', 'layout', 'show_text', 'follow', 'pagination'], $keys,
     )),
     'accounts' => $settings->accounts(),
 ]);
 check((bool) preg_match('/value="222" selected/', $widget), 'widget : choix de la Page');
 check(str_contains($widget, 'name="rows"') && (bool) preg_match('/name="featured"[^>]*checked/', $widget), 'widget : lignes et pleine largeur');
 check((bool) preg_match('/name="follow"[^>]*checked/', $widget), 'widget : barre « Nous suivre »');
+check((bool) preg_match('/name="pagination"[^>]*checked/', $widget), 'widget : pagination');
 
 // Compilation Twig avec cache disque (le code généré doit utiliser les classes préfixées).
 $compiled = glob(WP_CONTENT_DIR . '/cache/rezos-twig/*/*.php') ?: [];
@@ -322,6 +344,11 @@ $update = $updater->checkUpdate(false, [], $file);
 check(($update['version'] ?? null) === '9.0.0' && $update['package'] === 'https://github.test/d/rezos-9.0.0.zip' && $update['slug'] === 'rezos',
     'release GitHub → mise à jour proposée avec le zip construit');
 check($updater->checkUpdate(false, [], 'autre/autre.php') === false, 'autre plugin hébergé sur GitHub : ignoré');
+$GLOBALS['wp_version'] = Rezos\Admin\Updater::TESTED_UP_TO . '.4';
+check(($update['tested'] ?? null) !== null && Rezos\Admin\Updater::tested() === Rezos\Admin\Updater::TESTED_UP_TO . '.4',
+    'compatibilité : version de maintenance de la branche testée annoncée comme testée');
+$GLOBALS['wp_version'] = '99.0';
+check(Rezos\Admin\Updater::tested() === Rezos\Admin\Updater::TESTED_UP_TO, 'compatibilité : WordPress plus récent que la branche testée → non testé');
 $updater->checkUpdate(false, [], $file);
 check(count($GLOBALS['http_calls']) === 1, 'réponse GitHub mise en cache');
 $info = $updater->pluginInfo(false, 'plugin_information', (object) ['slug' => 'rezos']);
