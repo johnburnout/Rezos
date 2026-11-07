@@ -17,7 +17,13 @@ Stack : Composer, Symfony (HttpClient, OptionsResolver), Twig 3. PHP 8.1+, WordP
 
 Le zip contient déjà les dépendances, préfixées pour éviter les conflits avec d'autres plugins (voir [Build distribuable](#build-distribuable-dépendances-préfixées)) : Composer n'est pas nécessaire.
 
-Pour mettre à jour, téléversez le zip de la nouvelle version : WordPress propose de remplacer l'extension existante. Les réglages sont conservés et migrés si besoin.
+### Mises à jour
+
+Depuis la 1.2.0, Rezos se met à jour comme les autres extensions : dès qu'une release est publiée sur GitHub, elle apparaît dans *Tableau de bord › Mises à jour* et dans *Extensions* (bouton **Mettre à jour**, lien vers les notes de version, mises à jour automatiques activables). WordPress vérifie deux fois par jour ; Rezos garde la réponse de GitHub 6 h en cache, « Rechercher à nouveau » dans *Mises à jour* force la vérification.
+
+Seules les releases publiées qui contiennent le zip `rezos-<version>.zip` sont proposées (pas les brouillons ni les pré-versions). Les réglages sont conservés et migrés si besoin.
+
+Pour passer d'une version antérieure à la 1.2.0, téléversez une fois le zip à la main : WordPress propose de remplacer l'extension existante.
 
 ### Depuis les sources (développement)
 
@@ -109,6 +115,7 @@ src/Model/                Post, Account (Page connectée)
 src/Cache/FeedCache.php   transients + copie de secours
 src/Front/                Shortcode, Widget, FeedRenderer (OptionsResolver)
 src/Admin/SettingsPage.php
+src/Admin/Updater.php     mises à jour depuis les releases GitHub (Update URI)
 src/Twig/                 TwigFactory, WordPressExtension
 scoper.inc.php            config PHP-Scoper
 bin/build.sh              build préfixé + zip

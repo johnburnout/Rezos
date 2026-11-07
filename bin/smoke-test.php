@@ -113,6 +113,13 @@ function wp_date(string $format, int $ts): string { return date($format, $ts); }
 function human_time_diff(int $from, int $to): string { return '1 jour'; }
 function admin_url(string $path = ''): string { return '/wp-admin/' . $path; }
 function wp_nonce_field(...$args): string { return ''; }
+function get_site_transient(string $name): mixed { return $GLOBALS['wp_site_transients'][$name] ?? false; }
+function set_site_transient(string $name, mixed $value, int $ttl = 0): bool { $GLOBALS['wp_site_transients'][$name] = $value; return true; }
+function delete_site_transient(string $name): bool { unset($GLOBALS['wp_site_transients'][$name]); return true; }
+function wp_remote_get(string $url, array $args = []): array { $GLOBALS['http_calls'][] = $url; return $GLOBALS['http_response']; }
+function is_wp_error(mixed $v): bool { return false; }
+function wp_remote_retrieve_response_code(array $r): int { return $r['code']; }
+function wp_remote_retrieve_body(array $r): string { return $r['body']; }
 function shortcode_parse_atts(string $text): array|string
 {
     preg_match_all('/([\w-]+)\s*=\s*"([^"]*)"/', $text, $m, PREG_SET_ORDER);
@@ -277,6 +284,38 @@ $compiled = glob(WP_CONTENT_DIR . '/cache/rezos-twig/*/*.php') ?: [];
 $compiledCode = implode('', array_map('file_get_contents', $compiled));
 check($compiled !== [] && str_contains($compiledCode, 'use RezosVendor\\Twig\\Environment;'), 'templates compilés : classes Twig préfixées');
 check(!preg_match('/(?<![\\\\\w])Twig\\\\/', str_replace('RezosVendor\\Twig\\', '', $compiledCode)), 'templates compilés : aucune référence à Twig non préfixé');
+
+// ---------------------------------------------------------------------------
+// Mises à jour depuis les releases GitHub.
+// ---------------------------------------------------------------------------
+echo "Mises à jour\n";
+$release = static fn (string $tag, array $assets): array => ['code' => 200, 'body' => json_encode([
+    'tag_name' => $tag, 'draft' => false, 'prerelease' => false, 'html_url' => "https://github.test/r/$tag",
+    'published_at' => '2026-11-07T10:00:00Z', 'body' => "## Nouveautés\n\n- **Gras** et `code`\n- <script>x</script>",
+    'assets' => array_map(static fn (string $n): array => ['name' => $n, 'browser_download_url' => "https://github.test/d/$n"], $assets),
+])];
+$GLOBALS['wp_site_transients'] = [];
+$GLOBALS['http_calls'] = [];
+$GLOBALS['http_response'] = $release('v9.0.0', ['rezos-9.0.0.zip']);
+$updater = new Rezos\Admin\Updater();
+$file = plugin_basename(REZOS_FILE);
+$update = $updater->checkUpdate(false, [], $file);
+check(($update['version'] ?? null) === '9.0.0' && $update['package'] === 'https://github.test/d/rezos-9.0.0.zip' && $update['slug'] === 'rezos',
+    'release GitHub → mise à jour proposée avec le zip construit');
+check($updater->checkUpdate(false, [], 'autre/autre.php') === false, 'autre plugin hébergé sur GitHub : ignoré');
+$updater->checkUpdate(false, [], $file);
+check(count($GLOBALS['http_calls']) === 1, 'réponse GitHub mise en cache');
+$info = $updater->pluginInfo(false, 'plugin_information', (object) ['slug' => 'rezos']);
+check(str_contains($info->sections['changelog'] ?? '', '<li><strong>Gras</strong> et <code>code</code></li>')
+    && !str_contains($info->sections['changelog'], '<script>'), 'détails de la version : notes de release en HTML échappé');
+check($updater->pluginInfo(false, 'plugin_information', (object) ['slug' => 'akismet']) === false, 'détails d\'un autre plugin : ignorés');
+Rezos\Admin\Updater::flush();
+$GLOBALS['http_response'] = $release('v9.1.0', ['Source code.zip']);
+check($updater->checkUpdate(false, [], $file) === false, 'release sans zip construit : rien n\'est proposé');
+Rezos\Admin\Updater::flush();
+$GLOBALS['http_response'] = ['code' => 403, 'body' => '{"message":"rate limit"}'];
+check($updater->checkUpdate(false, [], $file) === false && $updater->checkUpdate(false, [], $file) === false
+    && count($GLOBALS['http_calls']) === 3, 'GitHub indisponible : pas de mise à jour, échec mis en cache');
 
 // ---------------------------------------------------------------------------
 // 5. GraphClient avec Symfony HttpClient préfixé (faux transport).

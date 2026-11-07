@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rezos;
 
 use Rezos\Admin\SettingsPage;
+use Rezos\Admin\Updater;
 use Rezos\Api\FacebookProvider;
 use Rezos\Api\GraphClient;
 use Rezos\Api\InstagramProvider;
@@ -45,6 +46,9 @@ final class Plugin
         $this->maybeUpgrade();
 
         (new Shortcode($this))->register();
+
+        // Toujours actif : WordPress vérifie aussi les mises à jour par le cron, hors administration.
+        (new Updater())->register();
 
         add_action('widgets_init', static function (): void {
             register_widget(Widget::class);
@@ -132,5 +136,6 @@ final class Plugin
         delete_option(Settings::OPTION);
         delete_option(self::DB_VERSION_OPTION);
         FeedCache::flushAll();
+        Updater::flush();
     }
 }
