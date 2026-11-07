@@ -56,7 +56,9 @@ Shortcode :
 
 Sans attribut `page`, le flux mélange toutes les Pages connectées, triées par date.
 
-Quand le flux affiche les deux sources, les **rediffusions** sont masquées : une publication Facebook qui reprend une publication Instagram de la même Page (ou l'inverse) n'apparaît qu'une fois — la plus ancienne est gardée. Sont rapprochées deux publications au même texte (aux emojis, ponctuation et sauts de ligne près) publiées à moins de 24 h d'écart, ou dont l'une n'a pas de texte, à moins de 15 min d'écart.
+Les **rediffusions** sont masquées, quelle que soit la source affichée : une publication Facebook qui reprend une publication Instagram de la même Page (ou l'inverse) n'apparaît qu'une fois — la plus ancienne est gardée. Sont rapprochées deux publications au même texte (aux emojis, ponctuation et sauts de ligne près) publiées à moins de 24 h d'écart, ou dont l'une n'a pas de texte, à moins de 15 min d'écart.
+
+Les **republications** sur un même réseau (même Page, même texte, à moins de 24 h d'écart) sont aussi masquées : seule la plus récente, souvent publiée pour corriger la première, est affichée.
 
 | Attribut | Valeurs | Défaut |
 |---|---|---|

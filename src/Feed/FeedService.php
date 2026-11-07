@@ -19,7 +19,7 @@ final class FeedService
     /** Nombre de posts récupérés par source et par Page (on filtre ensuite selon `limit`). */
     private const FETCH_SIZE = 30;
 
-    /** Écart maximal entre une publication et sa rediffusion de même texte sur l'autre réseau. */
+    /** Écart maximal entre deux publications de même texte (rediffusion ou republication). */
     private const CROSSPOST_WINDOW = 86400;
 
     /** Écart maximal quand l'une des deux n'a pas de texte (Meta en perd souvent à la rediffusion). */
@@ -48,13 +48,20 @@ final class FeedService
         $this->lastErrors = [];
         $posts = [];
 
+        // Toutes les sources sont lues, même celles qui ne sont pas affichées : une publication
+        // Facebook qui rediffuse celle du compte Instagram lié doit disparaître même si le flux
+        // ne montre que Facebook (et inversement). Les lectures sont en cache.
         foreach ($this->accounts($accountIds) as $account) {
-            foreach (array_unique($sources) as $source) {
+            foreach ($this->availableSources() as $source) {
                 $posts = [...$posts, ...$this->postsFor($source, $account)];
             }
         }
 
-        $posts = self::withoutCrossPosts($posts);
+        $wanted = array_unique($sources);
+        $posts = array_filter(
+            self::withoutDuplicates($posts),
+            static fn (Post $p): bool => in_array($p->source, $wanted, true),
+        );
 
         if ($type !== null && $type !== '') {
             $posts = array_filter($posts, static fn (Post $p): bool => $p->mediaType === $type);
@@ -73,10 +80,13 @@ final class FeedService
      *  - ou l'une n'a pas de texte, à moins de CROSSPOST_UNTEXTED_WINDOW d'intervalle.
      * La plus ancienne (l'originale) est gardée.
      *
+     * Retire aussi les republications sur une même source (même Page, même texte, à moins de
+     * CROSSPOST_WINDOW) : on garde alors la plus récente, souvent publiée pour corriger la première.
+     *
      * @param list<Post> $posts
      * @return list<Post>
      */
-    private static function withoutCrossPosts(array $posts): array
+    private static function withoutDuplicates(array $posts): array
     {
         // Du plus ancien au plus récent ; à égalité, Instagram d'abord (partage vers Facebook le plus courant).
         usort($posts, static fn (Post $a, Post $b): int => [$a->createdAt, $a->source !== 'instagram']
@@ -84,15 +94,32 @@ final class FeedService
 
         $kept = [];
         foreach ($posts as $post) {
-            foreach ($kept as $original) {
+            foreach ($kept as $i => $original) {
                 if (self::isCrossPost($original, $post)) {
+                    continue 2;
+                }
+                if (self::isRepost($original, $post)) {
+                    $kept[$i] = $post;
                     continue 2;
                 }
             }
             $kept[] = $post;
         }
 
-        return $kept;
+        return array_values($kept);
+    }
+
+    /** $post (le plus récent) republie-t-il $original sur la même source ? Seulement s'ils ont du texte. */
+    private static function isRepost(Post $original, Post $post): bool
+    {
+        if ($original->source !== $post->source || $original->accountId !== $post->accountId) {
+            return false;
+        }
+        $text = self::fingerprint($post->text);
+
+        return $text !== ''
+            && $text === self::fingerprint($original->text)
+            && $post->createdAt->getTimestamp() - $original->createdAt->getTimestamp() <= self::CROSSPOST_WINDOW;
     }
 
     /** $post (le plus récent) est-il la rediffusion de $original ? */

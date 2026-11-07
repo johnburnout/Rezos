@@ -208,7 +208,19 @@ check(str_contains($html, 'fbE') && !str_contains($html, 'igE'), 'deux publicati
 check(str_contains($html, 'igF') && str_contains($html, 'fbF'), 'sans texte à plus de 15 min : les deux sont affichées');
 check(str_contains($html, 'igB') && str_contains($html, 'fbB'), 'même texte à plus de 24 h d\'écart : les deux sont affichées');
 $html = $shortcode(['limit' => '30', 'source' => 'facebook']);
-check(str_contains($html, 'fbD'), 'source="facebook" seule : la publication Facebook reste affichée');
+check(!str_contains($html, 'fbD') && !str_contains($html, 'rezos-post--instagram'), 'source="facebook" seule : la rediffusion d\'un post Instagram est masquée');
+check(str_contains($html, 'fbA') && str_contains($html, 'fbE'), 'source="facebook" seule : les originales Facebook restent affichées');
+$html = $shortcode(['limit' => '30', 'source' => 'instagram']);
+check(!str_contains($html, 'igA') && str_contains($html, 'igD'), 'source="instagram" seule : la rediffusion d\'un post Facebook est masquée');
+// Republications sur Facebook : même texte, 2 min d'écart → la plus récente est gardée.
+$GLOBALS['wp_transients']['rezos_feed_facebook_111'][] = $same($post('facebook', 'fbR1', '2026-08-26T11:42:41+00:00', 'image', '111'), 'Réunion d’information demain');
+$GLOBALS['wp_transients']['rezos_feed_facebook_111'][] = $same($post('facebook', 'fbR2', '2026-08-26T11:44:53+00:00', 'image', '111'), 'Réunion d’information  demain');
+$GLOBALS['wp_transients']['rezos_feed_facebook_111'][] = $same($post('facebook', 'fbR3', '2026-06-01T10:00:00+00:00', 'image', '111'), 'Brioche');
+$GLOBALS['wp_transients']['rezos_feed_facebook_111'][] = $same($post('facebook', 'fbG', '2026-08-26T15:25:00+00:00', 'image', '111'), '');
+$html = $shortcode(['limit' => '30', 'source' => 'facebook']);
+check(str_contains($html, 'fbR2') && !str_contains($html, 'fbR1'), 'republication Facebook : seule la plus récente est affichée');
+check(str_contains($html, 'fbR3') && str_contains($html, 'fbB'), 'même texte sur Facebook à plus de 24 h : les deux sont affichées');
+check(str_contains($html, 'fbE') && str_contains($html, 'fbG'), 'publications Facebook sans texte jamais fusionnées entre elles');
 $GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [$post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111')];
 $GLOBALS['wp_transients']['rezos_feed_instagram_111'] = [$post('instagram', 'ig1', '2026-11-02T10:00:00+00:00', 'video', '111')];
 
