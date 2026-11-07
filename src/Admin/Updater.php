@@ -26,12 +26,13 @@ final class Updater
         add_filter('update_plugins_github.com', [$this, 'checkUpdate'], 10, 3);
         add_filter('plugins_api', [$this, 'pluginInfo'], 20, 3);
 
-        // « Rechercher à nouveau » dans Tableau de bord › Mises à jour : on ignore notre cache.
+        // « Vérifier à nouveau » dans Tableau de bord › Mises à jour : on ignore notre cache.
+        // Priorité 9 : avant wp_update_plugins(), accroché au même hook en priorité 10.
         add_action('load-update-core.php', static function (): void {
             if (!empty($_GET['force-check'])) {
                 self::flush();
             }
-        });
+        }, 9);
     }
 
     /**
