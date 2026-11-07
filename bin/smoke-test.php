@@ -183,26 +183,32 @@ check(Rezos\Front\Shortcode::parse('[rezos rows="2" featured="true"]') === ['row
     && Rezos\Front\Shortcode::parse('[gallery ids="1"]') === null, 'aperçu : analyse du shortcode saisi');
 $GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [$post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111')];
 
-// Rediffusions Facebook ↔ Instagram : même texte, même Page, moins de 24 h d'écart.
+// Rediffusions Facebook ↔ Instagram (cas relevés sur un vrai site).
 $same = static fn (array $p, string $text): array => ['text' => $text] + $p;
 $GLOBALS['wp_transients']['rezos_feed_instagram_111'] = [
     $post('instagram', 'ig1', '2026-11-02T10:00:00+00:00', 'video', '111'),
-    $same($post('instagram', 'igA', '2026-10-20T10:00:00+00:00', 'image', '111'), 'Nouveau  pain !'),
+    $same($post('instagram', 'igA', '2026-08-25T14:02:12+00:00', 'image', '111'), "C'est bientôt la rentrée !\nToutes les infos sur https://site.test 🧗😁. \nPs : coquille."),
     $same($post('instagram', 'igB', '2026-10-21T10:00:00+00:00', 'image', '111'), 'Brioche'),
+    $same($post('instagram', 'igD', '2026-09-07T18:23:52+00:00', 'image', '111'), 'Entraînements au Bugue'),
+    $same($post('instagram', 'igE', '2026-08-26T15:23:33+00:00', 'image', '111'), ''),
+    $same($post('instagram', 'igF', '2026-08-26T08:00:00+00:00', 'image', '111'), ''),
 ];
 $GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [
     $post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111'),
-    $same($post('facebook', 'fbA', '2026-10-20T10:02:00+00:00', 'image', '111'), "nouveau pain !\n"),
+    $same($post('facebook', 'fbA', '2026-08-25T13:44:53+00:00', 'image', '111'), "C'est bientôt la rentrée !\n\nToutes les infos sur https://site.test\n\nPs : coquille."),
     $same($post('facebook', 'fbB', '2026-10-25T10:00:00+00:00', 'image', '111'), 'Brioche'),
-    $same($post('facebook', 'fbC', '2026-10-19T10:00:00+00:00', 'image', '111'), 'Croissant'),
+    $same($post('facebook', 'fbD', '2026-09-07T18:25:13+00:00', 'text', '111'), ''),
+    $same($post('facebook', 'fbE', '2026-08-26T15:21:44+00:00', 'image', '111'), ''),
+    $same($post('facebook', 'fbF', '2026-08-26T11:44:53+00:00', 'image', '111'), 'Réunion demain'),
 ];
-$GLOBALS['wp_transients']['rezos_feed_instagram_111'][] = $same($post('instagram', 'igC', '2026-10-19T09:00:00+00:00', 'image', '111'), 'Croissant');
-$html = $shortcode(['limit' => '20']);
-check(str_contains($html, 'igA') && !str_contains($html, 'fbA'), 'rediffusion Facebook d\'un post Instagram masquée');
-check(str_contains($html, 'igC') && !str_contains($html, 'fbC'), 'rediffusion Instagram d\'un post Facebook masquée (la plus ancienne est gardée)');
+$html = $shortcode(['limit' => '30']);
+check(str_contains($html, 'fbA') && !str_contains($html, 'igA'), 'rediffusion au texte retouché (emojis, sauts de ligne) masquée, l\'originale gardée');
+check(str_contains($html, 'igD') && !str_contains($html, 'fbD'), 'rediffusion sans texte à 1 min masquée');
+check(str_contains($html, 'fbE') && !str_contains($html, 'igE'), 'deux publications sans texte à 2 min : une seule affichée');
+check(str_contains($html, 'igF') && str_contains($html, 'fbF'), 'sans texte à plus de 15 min : les deux sont affichées');
 check(str_contains($html, 'igB') && str_contains($html, 'fbB'), 'même texte à plus de 24 h d\'écart : les deux sont affichées');
-$html = $shortcode(['limit' => '20', 'source' => 'facebook']);
-check(str_contains($html, 'fbA'), 'source="facebook" seule : la publication Facebook reste affichée');
+$html = $shortcode(['limit' => '30', 'source' => 'facebook']);
+check(str_contains($html, 'fbD'), 'source="facebook" seule : la publication Facebook reste affichée');
 $GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [$post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111')];
 $GLOBALS['wp_transients']['rezos_feed_instagram_111'] = [$post('instagram', 'ig1', '2026-11-02T10:00:00+00:00', 'video', '111')];
 

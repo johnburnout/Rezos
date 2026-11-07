@@ -19,8 +19,11 @@ final class FeedService
     /** Nombre de posts récupérés par source et par Page (on filtre ensuite selon `limit`). */
     private const FETCH_SIZE = 30;
 
-    /** Écart maximal entre une publication et sa rediffusion sur l'autre réseau. */
+    /** Écart maximal entre une publication et sa rediffusion de même texte sur l'autre réseau. */
     private const CROSSPOST_WINDOW = 86400;
+
+    /** Écart maximal quand l'une des deux n'a pas de texte (Meta en perd souvent à la rediffusion). */
+    private const CROSSPOST_UNTEXTED_WINDOW = 900;
 
     /** @var list<string> */
     private array $lastErrors = [];
@@ -63,9 +66,12 @@ final class FeedService
     }
 
     /**
-     * Retire les rediffusions Facebook ↔ Instagram : même Page, même texte, autre source,
-     * publiées à moins de CROSSPOST_WINDOW d'intervalle. L'API ne signale pas les rediffusions ;
-     * on garde la plus ancienne (l'originale). Les publications sans texte ne sont jamais rapprochées.
+     * Retire les rediffusions Facebook ↔ Instagram d'une même Page. L'API ne les signale pas ;
+     * deux publications de sources différentes sont considérées comme l'originale et sa rediffusion si :
+     *  - leurs textes sont identiques une fois réduits aux lettres et chiffres (Meta retire emojis
+     *    et sauts de ligne au passage), à moins de CROSSPOST_WINDOW d'intervalle ;
+     *  - ou l'une n'a pas de texte, à moins de CROSSPOST_UNTEXTED_WINDOW d'intervalle.
+     * La plus ancienne (l'originale) est gardée.
      *
      * @param list<Post> $posts
      * @return list<Post>
@@ -77,26 +83,40 @@ final class FeedService
             <=> [$b->createdAt, $b->source !== 'instagram']);
 
         $kept = [];
-        $originals = []; // empreinte → publications conservées
         foreach ($posts as $post) {
-            $text = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $post->text) ?? ''));
-            if ($text === '') {
-                $kept[] = $post;
-                continue;
-            }
-
-            $key = $post->accountId . "\0" . $text;
-            foreach ($originals[$key] ?? [] as $original) {
-                if ($original->source !== $post->source
-                    && $post->createdAt->getTimestamp() - $original->createdAt->getTimestamp() <= self::CROSSPOST_WINDOW) {
+            foreach ($kept as $original) {
+                if (self::isCrossPost($original, $post)) {
                     continue 2;
                 }
             }
-            $originals[$key][] = $post;
             $kept[] = $post;
         }
 
         return $kept;
+    }
+
+    /** $post (le plus récent) est-il la rediffusion de $original ? */
+    private static function isCrossPost(Post $original, Post $post): bool
+    {
+        if ($original->source === $post->source || $original->accountId !== $post->accountId) {
+            return false;
+        }
+
+        $gap = $post->createdAt->getTimestamp() - $original->createdAt->getTimestamp();
+        $a = self::fingerprint($original->text);
+        $b = self::fingerprint($post->text);
+
+        if ($a === '' || $b === '') {
+            return $gap <= self::CROSSPOST_UNTEXTED_WINDOW;
+        }
+
+        return $a === $b && $gap <= self::CROSSPOST_WINDOW;
+    }
+
+    /** Texte réduit à ses lettres et chiffres, en minuscules. */
+    private static function fingerprint(string $text): string
+    {
+        return mb_strtolower(preg_replace('/[^\p{L}\p{N}]+/u', '', $text) ?? '');
     }
 
     /** @return list<string> */
