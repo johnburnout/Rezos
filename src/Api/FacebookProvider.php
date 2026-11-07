@@ -6,6 +6,7 @@ namespace Rezos\Api;
 
 use Rezos\Model\Account;
 use Rezos\Model\Post;
+use Rezos\Model\Profile;
 
 /**
  * Publications d'une Page Facebook : GET /{page-id}/posts
@@ -34,6 +35,21 @@ final class FacebookProvider implements PostProviderInterface
         );
 
         return array_map(fn (array $item): Post => $this->map($item, $account), $items);
+    }
+
+    public function profile(Account $account): Profile
+    {
+        $data = $this->graph->get($account->id, ['fields' => 'name,link,followers_count,fan_count'], $account->token);
+        // followers_count : abonnés de la Page ; fan_count (« J'aime ») pour les anciennes Pages.
+        $followers = $data['followers_count'] ?? $data['fan_count'] ?? null;
+
+        return new Profile(
+            source: 'facebook',
+            accountId: $account->id,
+            name: (string) ($data['name'] ?? $account->name),
+            url: (string) ($data['link'] ?? 'https://www.facebook.com/' . $account->id),
+            followers: $followers !== null ? (int) $followers : null,
+        );
     }
 
     /** @param array<string, mixed> $item */

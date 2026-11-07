@@ -73,6 +73,7 @@ Les **republications** sur un même réseau (même Page, même texte, à moins d
 | `columns` | publications par ligne, 1–6 | réglage (3) |
 | `rows` | nombre de lignes, 1–10 | réglage (3) |
 | `featured` | `true` / `false` : première ligne avec une seule publication, en pleine largeur | réglage (`false`) |
+| `follow` | `true` / `false` : barre « Nous suivre sur Facebook / Instagram » avec le nombre d'abonnés, en bas du flux | réglage (`true`) |
 | `layout` | `grid`, `list` (une publication par ligne) | `grid` |
 | `limit` | nombre total, 1–50 — remplace `columns` × `rows` | — |
 | `type` | `image`, `video`, `album`, `text` | tous |
@@ -83,9 +84,11 @@ Les **republications** sur un même réseau (même Page, même texte, à moins d
 
 Le nombre de publications affichées découle de la grille : `columns` × `rows`, ou `1 + columns × (rows − 1)` avec `featured="true"`.
 
+**Nous suivre** : en bas du flux, un lien vers la Page Facebook et un vers le compte Instagram de chaque Page affichée, avec leur nombre d'abonnés (mis en cache comme les publications). Désactivable dans *Réglages › Rezos*, pour chaque shortcode (`follow="false"`) ou dans le widget.
+
 **Aperçu** : la section *Aperçu* de *Réglages › Rezos* affiche le rendu de n'importe quel shortcode `[rezos …]` (un lien « Aperçu » est aussi proposé pour chaque Page connectée).
 
-Widget : *Apparence › Widgets › Rezos* (publications par ligne, lignes, première publication en pleine largeur, choix de la Page lorsque plusieurs sont connectées).
+Widget : *Apparence › Widgets › Rezos* (publications par ligne, lignes, première publication en pleine largeur, barre « Nous suivre », choix de la Page lorsque plusieurs sont connectées).
 
 ## Personnaliser l'affichage
 
@@ -111,7 +114,7 @@ src/Plugin.php            construction des services + hooks
 src/Settings.php          options
 src/Api/                  GraphClient, FacebookProvider, InstagramProvider
 src/Feed/FeedService.php  agrégation (sources × Pages), tri, cache
-src/Model/                Post, Account (Page connectée)
+src/Model/                Post, Account (Page connectée), Profile (Nous suivre)
 src/Cache/FeedCache.php   transients + copie de secours
 src/Front/                Shortcode, Widget, FeedRenderer (OptionsResolver)
 src/Admin/SettingsPage.php

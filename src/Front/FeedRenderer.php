@@ -33,13 +33,15 @@ final class FeedRenderer
 
         $feed = $this->plugin->feed();
         $posts = $feed->getPosts($opts['source'], $opts['limit'], $opts['type'], $opts['page']);
+        $profiles = $opts['follow'] ? $feed->profiles($opts['page']) : [];
 
         wp_enqueue_style('rezos');
 
         $html = $this->plugin->twig()->render($opts['template'], [
-            'posts'   => $posts,
-            'options' => $opts,
-            'errors'  => current_user_can('manage_options') ? $feed->lastErrors() : [],
+            'posts'    => $posts,
+            'profiles' => $profiles,
+            'options'  => $opts,
+            'errors'   => current_user_can('manage_options') ? $feed->lastErrors() : [],
             'uid'     => wp_unique_id('rezos-'),
         ]);
 
@@ -71,6 +73,8 @@ final class FeedRenderer
             'show_date' => true,
             'show_stats'=> false,
             'show_account' => null,
+            // Barre « Nous suivre sur Facebook / Instagram » en bas du flux.
+            'follow'    => (bool) $settings->get('default_follow'),
             'excerpt'   => 140,
             'template'  => 'feed.html.twig',
         ]);
@@ -140,6 +144,7 @@ final class FeedRenderer
         $r->setNormalizer('show_text', $toBool);
         $r->setNormalizer('show_date', $toBool);
         $r->setNormalizer('show_stats', $toBool);
+        $r->setNormalizer('follow', $toBool);
         $r->setAllowedValues('layout', ['grid', 'list']);
         $r->setAllowedValues('type', [null, 'image', 'video', 'album', 'text']);
         // Un nom de fichier simple : pas de remontée de répertoire.

@@ -35,6 +35,8 @@ final class WordPressExtension extends AbstractExtension
             new TwigFilter('time_ago', static function (\DateTimeInterface $date): string {
                 return sprintf(__('il y a %s', 'rezos'), human_time_diff($date->getTimestamp(), time()));
             }),
+            // {{ 1234|number }} : « 1 234 » selon la langue du site
+            new TwigFilter('number', static fn (int|float $n): string => number_format_i18n($n)),
             // URL nettoyée et échappée par WordPress
             new TwigFilter('esc_url', static fn (?string $url): string => esc_url((string) $url), ['is_safe' => ['html', 'html_attr']]),
             // Rend les URLs et sauts de ligne d'un texte (déjà échappé)

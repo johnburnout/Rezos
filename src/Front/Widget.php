@@ -21,6 +21,7 @@ final class Widget extends \WP_Widget
         'featured'  => false,
         'layout'    => 'grid',
         'show_text' => false,
+        'follow'    => true,
     ];
 
     public function __construct()
@@ -51,6 +52,7 @@ final class Widget extends \WP_Widget
             'featured'  => $instance['featured'],
             'layout'    => $instance['layout'],
             'show_text' => $instance['show_text'],
+            'follow'    => $instance['follow'],
         ]);
         echo $args['after_widget'];
     }
@@ -89,6 +91,7 @@ final class Widget extends \WP_Widget
             'featured'  => !empty($new['featured']),
             'layout'    => ($new['layout'] ?? '') === 'list' ? 'list' : 'grid',
             'show_text' => !empty($new['show_text']),
+            'follow'    => !empty($new['follow']),
         ];
     }
 

@@ -51,6 +51,16 @@
                     <p class="description">{{ __('Modifiables pour chaque shortcode avec les attributs columns, rows et featured.') }}</p>
                 </td>
             </tr>
+            <tr>
+                <th scope="row">{{ __('Nous suivre') }}</th>
+                <td>
+                    <label>
+                        <input name="default_follow" type="checkbox" value="1" {{ settings.default_follow ? 'checked' }}>
+                        {{ __('Afficher en bas du flux les liens « Nous suivre sur Facebook / Instagram » avec le nombre d\'abonnés') }}
+                    </label>
+                    <p class="description">{{ __('Modifiable pour chaque shortcode avec l\'attribut follow.') }}</p>
+                </td>
+            </tr>
         </table>
         <p><button type="submit" class="button button-primary">{{ __('Enregistrer') }}</button></p>
     </form>
@@ -174,6 +184,7 @@
             <tr><td><code>columns</code></td><td>{{ __('publications par ligne') }}, 1 – 6</td><td>{{ settings.default_columns }}</td></tr>
             <tr><td><code>rows</code></td><td>{{ __('nombre de lignes') }}, 1 – 10</td><td>{{ settings.default_rows }}</td></tr>
             <tr><td><code>featured</code></td><td><code>true</code>, <code>false</code> ({{ __('première ligne : une seule publication en pleine largeur') }})</td><td><code>{{ settings.default_featured ? 'true' : 'false' }}</code></td></tr>
+            <tr><td><code>follow</code></td><td><code>true</code>, <code>false</code> ({{ __('barre « Nous suivre » avec le nombre d\'abonnés') }})</td><td><code>{{ settings.default_follow ? 'true' : 'false' }}</code></td></tr>
             <tr><td><code>layout</code></td><td><code>grid</code>, <code>list</code> ({{ __('une publication par ligne') }})</td><td><code>grid</code></td></tr>
             <tr><td><code>limit</code></td><td>{{ __('nombre total, 1 – 50 (remplace columns × rows)') }}</td><td>—</td></tr>
             <tr><td><code>type</code></td><td><code>image</code>, <code>video</code>, <code>album</code>, <code>text</code></td><td>{{ __('tous') }}</td></tr>

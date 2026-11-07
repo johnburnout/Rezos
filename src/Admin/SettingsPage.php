@@ -86,6 +86,7 @@ final class SettingsPage
             'default_columns'  => max(1, min(Settings::MAX_COLUMNS, (int) ($in['default_columns'] ?? 3))),
             'default_rows'     => max(1, min(Settings::MAX_ROWS, (int) ($in['default_rows'] ?? 3))),
             'default_featured' => !empty($in['default_featured']),
+            'default_follow'   => !empty($in['default_follow']),
         ];
         // Champ secret laissé vide = conserver la valeur actuelle.
         $secret = trim((string) ($in['app_secret'] ?? ''));

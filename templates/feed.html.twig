@@ -5,6 +5,8 @@
   Variables :
     posts   : liste de Rezos\Model\Post (source, id, text, imageUrl, mediaType, permalink, createdAt, likes, comments,
               accountId, accountName = nom de la Page ou @compte Instagram)
+    profiles: liste de Rezos\Model\Profile (source, name, url, followers) pour la barre « Nous suivre »,
+              vide si follow="false"
     options : options résolues du shortcode / widget
     errors  : erreurs API (visibles uniquement par les administrateurs)
     uid     : identifiant HTML unique
@@ -24,6 +26,28 @@
             {% for post in posts %}
                 <li class="rezos__item">
                     {% include '_post.html.twig' with { post: post, options: options } only %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if profiles is not empty %}
+        <ul class="rezos__follow">
+            {% for profile in profiles %}
+                <li class="rezos-follow rezos-follow--{{ profile.source }}">
+                    <a class="rezos-follow__link" href="{{ profile.url|esc_url }}" target="_blank" rel="noopener">
+                        <span class="rezos-follow__label">
+                            {{- profile.source == 'instagram' ? __('Nous suivre sur Instagram') : __('Nous suivre sur Facebook') -}}
+                        </span>
+                        {% if options.show_account %}
+                            <span class="rezos-follow__account">{{ profile.name }}</span>
+                        {% endif %}
+                        {% if profile.followers is not null %}
+                            <span class="rezos-follow__count">
+                                {{- _n('%s abonné', '%s abonnés', profile.followers)|format(profile.followers|number) -}}
+                            </span>
+                        {% endif %}
+                    </a>
                 </li>
             {% endfor %}
         </ul>

@@ -35,6 +35,10 @@
     <label for="{{ fields.featured.id }}">{{ __('Première publication en pleine largeur') }}</label>
 </p>
 <p>
+    <input class="checkbox" id="{{ fields.follow.id }}" name="{{ fields.follow.name }}" type="checkbox" value="1" {{ instance.follow ? 'checked' }}>
+    <label for="{{ fields.follow.id }}">{{ __('Liens « Nous suivre » avec les abonnés') }}</label>
+</p>
+<p>
     <label for="{{ fields.layout.id }}">{{ __('Disposition :') }}</label>
     <select id="{{ fields.layout.id }}" name="{{ fields.layout.name }}">
         <option value="grid" {{ instance.layout == 'grid' ? 'selected' }}>{{ __('Grille') }}</option>

@@ -6,6 +6,7 @@ namespace Rezos\Api;
 
 use Rezos\Model\Account;
 use Rezos\Model\Post;
+use Rezos\Model\Profile;
 
 /**
  * Médias du compte Instagram professionnel lié à la Page : GET /{ig-user-id}/media
@@ -32,6 +33,20 @@ final class InstagramProvider implements PostProviderInterface
         );
 
         return array_map(fn (array $item): Post => $this->map($item, $account), $items);
+    }
+
+    public function profile(Account $account): Profile
+    {
+        $data = $this->graph->get($account->igId, ['fields' => 'username,followers_count'], $account->token);
+        $username = (string) ($data['username'] ?? $account->igUsername);
+
+        return new Profile(
+            source: 'instagram',
+            accountId: $account->id,
+            name: '@' . $username,
+            url: 'https://www.instagram.com/' . rawurlencode($username) . '/',
+            followers: isset($data['followers_count']) ? (int) $data['followers_count'] : null,
+        );
     }
 
     /** @param array<string, mixed> $item */

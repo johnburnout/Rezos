@@ -9,6 +9,7 @@ use Rezos\Api\PostProviderInterface;
 use Rezos\Cache\FeedCache;
 use Rezos\Model\Account;
 use Rezos\Model\Post;
+use Rezos\Model\Profile;
 use Rezos\Settings;
 
 /**
@@ -177,6 +178,36 @@ final class FeedService
         return array_values(array_filter($accounts, static fn (Account $a): bool => in_array($a->id, $ids, true)));
     }
 
+    /**
+     * Profils (lien, abonnés) de chaque source des Pages demandées, pour la barre « Nous suivre ».
+     * Facebook d'abord, puis Instagram, Page par Page. En cache comme les flux.
+     *
+     * @param list<string>|null $accountIds
+     * @return list<Profile>
+     */
+    public function profiles(?array $accountIds = null): array
+    {
+        $profiles = [];
+        foreach ($this->accounts($accountIds) as $account) {
+            foreach ($this->providers as $source => $provider) {
+                if (!$provider->supports($account)) {
+                    continue;
+                }
+                $data = $this->cached('profile_' . $source . '_' . $account->id, $source, $account,
+                    static fn (): array => $provider->profile($account)->toArray());
+                if ($data !== null) {
+                    try {
+                        $profiles[] = Profile::fromArray($data);
+                    } catch (\Throwable) {
+                        // Entrée de cache illisible : la barre se passe de ce profil.
+                    }
+                }
+            }
+        }
+
+        return $profiles;
+    }
+
     /** @return list<Post> */
     private function postsFor(string $source, Account $account): array
     {
@@ -197,14 +228,44 @@ final class FeedService
 
             return $posts;
         } catch (GraphException $e) {
-            $label = sprintf('%s (%s)', $source, $account->name !== '' ? $account->name : $account->id);
-            $this->lastErrors[] = $label . ' : ' . $e->getMessage();
-            if (function_exists('error_log')) {
-                error_log('[rezos] ' . $label . ' : ' . $e->getMessage());
-            }
+            $this->logError($source, $account, $e);
 
             // Mieux vaut un flux un peu ancien qu'un bloc vide.
             return $this->cache->getStale($key) ?? [];
+        }
+    }
+
+    /**
+     * Lecture en cache de données brutes, avec la dernière copie valide en secours.
+     *
+     * @param callable(): array<mixed> $fetch
+     * @return array<mixed>|null
+     */
+    private function cached(string $key, string $source, Account $account, callable $fetch): ?array
+    {
+        $cached = $this->cache->getData($key);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        try {
+            $data = $fetch();
+            $this->cache->setData($key, $data);
+
+            return $data;
+        } catch (GraphException $e) {
+            $this->logError($source, $account, $e);
+
+            return $this->cache->getData($key, stale: true);
+        }
+    }
+
+    private function logError(string $source, Account $account, GraphException $e): void
+    {
+        $label = sprintf('%s (%s)', $source, $account->name !== '' ? $account->name : $account->id);
+        $this->lastErrors[] = $label . ' : ' . $e->getMessage();
+        if (function_exists('error_log')) {
+            error_log('[rezos] ' . $label . ' : ' . $e->getMessage());
         }
     }
 }

@@ -34,7 +34,20 @@ final class FeedCache
     /** @param list<Post> $posts */
     public function set(string $key, array $posts): void
     {
-        $payload = array_map(static fn (Post $p): array => $p->toArray(), $posts);
+        $this->setData($key, array_map(static fn (Post $p): array => $p->toArray(), $posts));
+    }
+
+    /** Données brutes (profils…) : même durée et même copie de secours que les flux. */
+    public function getData(string $key, bool $stale = false): ?array
+    {
+        $raw = $stale ? get_option(self::STALE_PREFIX . $key, false) : get_transient(self::PREFIX . $key);
+
+        return is_array($raw) ? $raw : null;
+    }
+
+    /** @param array<mixed> $payload */
+    public function setData(string $key, array $payload): void
+    {
         set_transient(self::PREFIX . $key, $payload, max(60, $this->ttl));
         update_option(self::STALE_PREFIX . $key, $payload, false);
     }

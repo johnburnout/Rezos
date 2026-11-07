@@ -120,6 +120,7 @@ function wp_remote_get(string $url, array $args = []): array { $GLOBALS['http_ca
 function is_wp_error(mixed $v): bool { return false; }
 function wp_remote_retrieve_response_code(array $r): int { return $r['code']; }
 function wp_remote_retrieve_body(array $r): string { return $r['body']; }
+function number_format_i18n(int|float $n): string { return number_format($n, 0, ',', ' '); }
 function shortcode_parse_atts(string $text): array|string
 {
     preg_match_all('/([\w-]+)\s*=\s*"([^"]*)"/', $text, $m, PREG_SET_ORDER);
@@ -162,6 +163,13 @@ $post = static fn (string $source, string $id, string $date, string $type, strin
 $GLOBALS['wp_transients']['rezos_feed_facebook_111'] = [$post('facebook', 'fb1', '2026-11-01T10:00:00+00:00', 'image', '111')];
 $GLOBALS['wp_transients']['rezos_feed_instagram_111'] = [$post('instagram', 'ig1', '2026-11-02T10:00:00+00:00', 'video', '111')];
 $GLOBALS['wp_transients']['rezos_feed_facebook_222'] = [$post('facebook', 'fb2', '2026-11-03T10:00:00+00:00', 'text', '222')];
+// Profils en cache pour la barre « Nous suivre ».
+$profile = static fn (string $source, string $account, string $name, ?int $followers): array => [
+    'source' => $source, 'accountId' => $account, 'name' => $name, 'url' => "https://$source.test/$name", 'followers' => $followers,
+];
+$GLOBALS['wp_transients']['rezos_feed_profile_facebook_111'] = $profile('facebook', '111', 'Boulangerie', 1234);
+$GLOBALS['wp_transients']['rezos_feed_profile_instagram_111'] = $profile('instagram', '111', '@boulangerie', 1);
+$GLOBALS['wp_transients']['rezos_feed_profile_facebook_222'] = $profile('facebook', '222', 'Fromagerie', null);
 
 $html = $shortcode(['limit' => '5', 'show_stats' => 'true']);
 check(str_contains($html, 'rezos-post--instagram') && str_contains($html, 'rezos-post--facebook'), 'une Page : les deux sources sont affichées');
@@ -169,6 +177,11 @@ check(strpos($html, 'ig1') < strpos($html, 'fb1'), 'une Page : tri par date déc
 check(str_contains($html, '&lt;b&gt;gras&lt;/b&gt;'), 'texte échappé par Twig');
 check(str_contains($html, '♥ 3'), 'statistiques (show_stats)');
 check(!str_contains($html, 'rezos-post__account'), 'une Page : nom de Page masqué par défaut');
+check(str_contains($html, 'Nous suivre sur Facebook') && str_contains($html, 'Nous suivre sur Instagram')
+    && strpos($html, 'Nous suivre') > strpos($html, 'rezos__list'), 'barre « Nous suivre » en bas du flux');
+check(str_contains($html, '1 234 abonnés') && str_contains($html, '1 abonné<') && str_contains($html, 'href="https://instagram.test/@boulangerie"'),
+    'Nous suivre : nombre d\'abonnés et lien du profil');
+check(!str_contains($shortcode(['follow' => 'false']), 'rezos__follow'), 'follow="false" : pas de barre « Nous suivre »');
 
 // Grille : colonnes × lignes, première ligne en pleine largeur.
 $count = static fn (string $html): int => substr_count($html, 'class="rezos__item"');
@@ -241,10 +254,14 @@ $html = $shortcode(['limit' => '10']);
 check(str_contains($html, 'fb1') && str_contains($html, 'ig1') && str_contains($html, 'fb2'), 'deux Pages : publications des deux Pages');
 check(strpos($html, 'fb2') < strpos($html, 'ig1'), 'deux Pages : tri par date sur l\'ensemble');
 check(str_contains($html, 'rezos-post__account">Nom-222'), 'deux Pages : nom de la Page affiché');
+check(str_contains($html, 'rezos-follow__account">Fromagerie') && substr_count($html, 'class="rezos-follow ') === 3,
+    'deux Pages : un lien « Nous suivre » par Page et par réseau, avec le nom');
 
 $html = $shortcode(['page' => '222']);
 check(str_contains($html, 'fb2') && !str_contains($html, 'fb1') && !str_contains($html, 'ig1'), 'page="222" : uniquement cette Page');
 check(!str_contains($html, 'rezos-post__account'), 'page="222" : nom de Page masqué (une seule Page)');
+check(str_contains($html, 'Nous suivre sur Facebook') && !str_contains($html, 'Nous suivre sur Instagram') && !str_contains($html, 'abonné'),
+    'page="222" sans Instagram ni nombre d\'abonnés : lien Facebook seul');
 
 $html = $shortcode(['page' => '@Boulangerie', 'source' => 'instagram']);
 check(str_contains($html, 'ig1') && !str_contains($html, 'fb'), 'page="@compte" : sélection par compte Instagram');
@@ -264,20 +281,22 @@ $admin = $twig->render('admin/settings.html.twig', [
     'preview_code' => '[rezos rows="1"]', 'preview_html' => '<div class="rezos">APERCU</div>', 'preview_error' => null,
 ]);
 check(str_contains($admin, 'name="default_rows"') && str_contains($admin, 'name="default_featured"'), 'admin : réglages colonnes / lignes / pleine largeur');
+check((bool) preg_match('/name="default_follow"[^>]*checked/', $admin), 'admin : réglage « Nous suivre », activé par défaut');
 check(str_contains($admin, '<div class="rezos">APERCU</div>') && str_contains($admin, 'value="[rezos rows=&quot;1&quot;]"'), 'admin : aperçu du shortcode');
 check(str_contains($admin, 'preview=%5Brezos%20page%3D%22222%22%5D'), 'admin : lien d\'aperçu par Page');
 check(str_contains($admin, '[rezos page="222"]') && str_contains($admin, '@boulangerie'), 'admin : liste des Pages connectées');
 check(str_contains($admin, 'Instagram @epicerie'), 'admin : Pages proposées (Account)');
 check((bool) preg_match('/value="222"\s+checked/', $admin) && !preg_match('/value="333"\s+checked/', $admin), 'admin : Pages déjà connectées pré-cochées');
 $widget = $twig->render('admin/widget-form.html.twig', [
-    'instance' => ['title' => '', 'source' => 'all', 'page' => '222', 'columns' => 3, 'rows' => 2, 'featured' => true, 'layout' => 'grid', 'show_text' => false],
+    'instance' => ['title' => '', 'source' => 'all', 'page' => '222', 'columns' => 3, 'rows' => 2, 'featured' => true, 'layout' => 'grid', 'show_text' => false, 'follow' => true],
     'fields' => array_map(static fn (string $k): array => ['id' => $k, 'name' => $k], array_combine(
-        $keys = ['title', 'source', 'page', 'columns', 'rows', 'featured', 'layout', 'show_text'], $keys,
+        $keys = ['title', 'source', 'page', 'columns', 'rows', 'featured', 'layout', 'show_text', 'follow'], $keys,
     )),
     'accounts' => $settings->accounts(),
 ]);
 check((bool) preg_match('/value="222" selected/', $widget), 'widget : choix de la Page');
 check(str_contains($widget, 'name="rows"') && (bool) preg_match('/name="featured"[^>]*checked/', $widget), 'widget : lignes et pleine largeur');
+check((bool) preg_match('/name="follow"[^>]*checked/', $widget), 'widget : barre « Nous suivre »');
 
 // Compilation Twig avec cache disque (le code généré doit utiliser les classes préfixées).
 $compiled = glob(WP_CONTENT_DIR . '/cache/rezos-twig/*/*.php') ?: [];
@@ -346,6 +365,25 @@ $pages = $graph->listPages('tok');
 check(array_map(static fn ($p) => $p->id, $pages) === ['p1', 'p2'] && $pages[1]->igId === 'ig2' && $pages[0]->token === 't1' && !$pages[0]->hasInstagram(),
     'me/accounts : toutes les Pages en Account (pagination)');
 check(str_contains($requests[3] ?? '', 'after=CUR') && count($requests) === 4, 'me/accounts : curseur « after » suivi, arrêt sans « next »');
+
+$profileRequests = [];
+$profileGraph = new Rezos\Api\GraphClient(new RezosVendor\Symfony\Component\HttpClient\MockHttpClient(
+    static function (string $method, string $url) use (&$profileRequests) {
+        $profileRequests[] = $url;
+        $json = str_contains($url, '/ig9?')
+            ? '{"id":"ig9","username":"perigord.escalade","followers_count":845}'
+            : '{"id":"9","name":"Périgord Escalade","link":"https://www.facebook.com/perigordescalade","followers_count":1520,"fan_count":1400}';
+
+        return new RezosVendor\Symfony\Component\HttpClient\Response\MockResponse($json);
+    },
+), 'v25.0');
+$account = new Rezos\Model\Account('9', 'PE', 'tok', 'ig9', 'perigord.escalade');
+$fbProfile = (new Rezos\Api\FacebookProvider($profileGraph))->profile($account);
+$igProfile = (new Rezos\Api\InstagramProvider($profileGraph))->profile($account);
+check($fbProfile->followers === 1520 && $fbProfile->url === 'https://www.facebook.com/perigordescalade' && str_contains($profileRequests[0], 'followers_count'),
+    'profil Facebook : abonnés (followers_count) et lien de la Page');
+check($igProfile->followers === 845 && $igProfile->url === 'https://www.instagram.com/perigord.escalade/' && $igProfile->name === '@perigord.escalade',
+    'profil Instagram : abonnés et lien du compte');
 
 // ---------------------------------------------------------------------------
 // 6. Cohabitation avec l'autre Twig.

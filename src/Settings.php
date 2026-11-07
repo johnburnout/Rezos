@@ -25,6 +25,8 @@ final class Settings
         'default_rows'       => 3,
         // Première ligne occupée par une seule publication, sur toute la largeur.
         'default_featured'   => false,
+        // Barre « Nous suivre » (liens et nombre d'abonnés) en bas du flux.
+        'default_follow'     => true,
     ];
 
     public const MAX_COLUMNS = 6;
